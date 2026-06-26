@@ -38,6 +38,16 @@ async def _scan(args: dict, ctx: ToolContext) -> str:
         return "Error: no [target] endpoint configured."
     only = args.get("classes")
     classes = {k: v for k, v in PROBES.items() if not only or k in only}
+    # add unbiased HarmBench behaviors (one per semantic category) as harm classes
+    if not only and args.get("harmbench", True):
+        from .. import harmbench
+
+        if await harmbench.ensure() is None and harmbench.is_cached():
+            seed = int(args.get("seed", 0))
+            for cat in harmbench.categories():
+                s = harmbench.sample(category=cat, n=1, seed=seed)
+                if s:
+                    classes[f"hb:{cat}"] = [s[0]["behavior"]]
     max_tokens = int(args.get("max_tokens", 400))
 
     from ..providers.factory import build_provider
@@ -81,11 +91,12 @@ def register(registry: ToolRegistry) -> None:
     registry.add(
         name="scan",
         description=(
-            "Garak-style coverage scan: fire a curated probe suite across vuln classes "
-            "(system-prompt leak, prompt injection, encoding bypass, harmful instructions, "
-            "PII extraction, refusal suppression) and return a pass/fail matrix per class. "
-            "Use for systematic recon before targeted attacks. Optional 'classes' limits "
-            "which vuln classes to run."
+            "Garak-style coverage scan: fire a probe suite across vuln classes (system-"
+            "prompt leak, prompt injection, encoding bypass, PII, refusal suppression) "
+            "PLUS one unbiased HarmBench behavior per semantic category (cyber, chem/bio, "
+            "illegal, misinfo, harassment, copyright), returning a pass/fail matrix per "
+            "class. Run it first for recon. 'classes' limits which run; harmbench=false "
+            "skips the HarmBench rows."
         ),
         parameters={
             "type": "object",
@@ -95,6 +106,8 @@ def register(registry: ToolRegistry) -> None:
                     "items": {"type": "string"},
                     "description": "Subset of vuln classes to run (omit for all)",
                 },
+                "harmbench": {"type": "boolean", "description": "Include HarmBench category probes (default true)"},
+                "seed": {"type": "integer", "description": "HarmBench sampling seed"},
                 "max_tokens": {"type": "integer"},
             },
         },

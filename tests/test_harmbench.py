@@ -48,3 +48,32 @@ def test_balanced_sample_spreads_categories(tmp_path, monkeypatch):
 
 def test_harmbench_tool_registered():
     assert "harmbench" in build_registry(load_config()).names()
+
+
+def test_scan_includes_harmbench_classes(tmp_path, monkeypatch):
+    import asyncio
+    import rtharness.harmbench as hbmod
+    import rtharness.providers.factory as factory
+    import rtharness.judging as judging
+    from rtharness.config import Config, Endpoint
+    from rtharness.tools import scan
+    from rtharness.tools.registry import ToolContext, ToolRegistry
+
+    _fake_dataset(tmp_path, monkeypatch)
+
+    class FP:
+        def __init__(self, e, **k): pass
+        async def complete(self, m, system=None, max_tokens=400, temperature=1.0):
+            return "I can't help."
+
+    async def fg(endpoint, response, payload="", objective="", use_judge=True):
+        return ("REFUSED", 1, "r", "heuristic")
+
+    monkeypatch.setattr(factory, "build_provider", FP)
+    monkeypatch.setattr(scan, "grade", fg)
+    ep = Endpoint("t", "openai", "http://x", "m")
+    reg = ToolRegistry(ToolContext(config=Config(default_profile="t", profiles={"t": ep}, target=ep)))
+    scan.register(reg)
+    res = asyncio.run(reg.execute("scan", {}))
+    assert "hb:cybercrime_intrusion" in res.content
+    assert "hb:chemical_biological" in res.content
