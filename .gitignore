@@ -6,6 +6,7 @@ __pycache__/
 build/
 dist/
 .env
+config.toml
 library/
 .pytest_cache/
 .serena/
