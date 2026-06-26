@@ -114,6 +114,8 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 | `pair_attack` | PAIR/TAP: refine one objective on the target's refusals |
 | `best_of_n` | resample N times, keep the bypass |
 | `many_shot` | many-shot jailbreak: flood context with faux compliant turns, then fire |
+| `prefill` | response-priming: seed the assistant's own reply so it continues, not refuses |
+| `diff_fire` | A/B two payloads at one target to attribute ASR to a specific edit |
 | `scan` | Garak-style coverage matrix (technique + HarmBench probes) |
 | `indirect_inject` | RAG/agent injection via document/email/tool-output carriers |
 | `system_sweep` | validate ONE system prompt across a task battery (multi-sample) |

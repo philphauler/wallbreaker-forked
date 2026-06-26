@@ -106,6 +106,7 @@ class RthApp(App):
         self.asr_hits = 0
         self.asr_total = 0
         self._last_payload = ""
+        self._last_verdict = ""
         self.exit_on_finish = bool(prefs.get("exit_on_finish", True))
         self.judge_enabled = bool(prefs.get("judge", True))
         self.judge_model_override = prefs.get("judge_model")
@@ -165,6 +166,9 @@ class RthApp(App):
 
     def _status_text(self) -> str:
         tgt = self.config.target.model if self.config.target else "none"
+        pin = self.config.target.provider if self.config.target else ()
+        if pin:
+            tgt += f"@{'+'.join(pin)}"
         mode = f"auto({self.max_rounds})" if self.auto else "single"
         asr = (
             f"{self.asr_hits}/{self.asr_total}"
@@ -174,9 +178,10 @@ class RthApp(App):
         state = "WORKING" if self._busy else "idle"
         tok = f"{self.tokens_in}>{self.tokens_out}tok"
         judge = "judge" if self.judge_enabled else "heur"
+        last = f" | last={self._last_verdict}" if self._last_verdict else ""
         return (
             f" {state} | profile={self.endpoint.name} | model={self.endpoint.model} | "
-            f"target={tgt} | {mode} | ASR={asr}/{judge} | {tok}"
+            f"target={tgt} | {mode} | ASR={asr}/{judge}{last} | {tok}"
         )
 
     def _refresh_status(self) -> None:
@@ -444,6 +449,7 @@ class RthApp(App):
         self.asr_total += 1
         if label in ("COMPLIED", "PARTIAL"):
             self.asr_hits += 1
+        self._last_verdict = label
         self.runlog.verdict(payload, reply, label, reason)
 
     def _on_error(self, message: str) -> None:
