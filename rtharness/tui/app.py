@@ -32,6 +32,7 @@ HELP_TEXT = """Slash commands:
 /autoexit [on|off]    when the agent calls finish(), close the tool (default on)
 /rounds <n>           set the autonomous round cap
 /transforms           list Parseltongue transforms
+/encode <chain> <text>    preview a transform chain on text (no fire), copies result
 /tools                 list every tool in the agent's arsenal
 /preset [list|name]   curated jailbreak seed templates (copies to clipboard)
 /objective [text]     set the engagement goal (threaded into the run + report)
@@ -45,6 +46,7 @@ HELP_TEXT = """Slash commands:
 /judge [on|off]       LLM judge verdicts on target replies (default on)
 /judge model <id>     swap the judge model live (/judge default to reset)
 /asr                  show the attack scoreboard (hits / held / log path)
+/stats                analytics from the run log: verdict mix, ASR bar, top tools
 /findings [log]       list the bypasses (COMPLIED/PARTIAL) from the run log
 /report [path]        write a markdown findings report from the run log
 /session save|load [path]   persist or reload the whole engagement
@@ -514,6 +516,8 @@ class RthApp(App):
                 f"{t.name:14} {t.description}" for t in list_transforms()
             )
             self._mount(widgets.info_panel(catalog, title="transforms"))
+        elif cmd == "/encode":
+            self._cmd_encode(rest)
         elif cmd == "/tools":
             tools = self.registry.tools.values()
             body = "\n".join(
@@ -540,6 +544,8 @@ class RthApp(App):
                 f"log: {self.runlog.path}",
                 title="attack scoreboard",
             ))
+        elif cmd == "/stats":
+            self._cmd_stats()
         elif cmd == "/objective":
             self._cmd_objective(raw_arg)
         elif cmd == "/template":
@@ -902,6 +908,101 @@ class RthApp(App):
         res = await self.registry.execute("system_sweep", args)
         self._mount(widgets.info_panel(res.content, title="sysprompt sweep"))
         self._refresh_status()
+
+    def _cmd_encode(self, rest: list[str]) -> None:
+        from ..transforms import TRANSFORMS, apply_chain, reverse_chain
+
+        if len(rest) < 2:
+            self._mount(widgets.error_panel(
+                "usage: /encode <chain> <text>   e.g. /encode leet,base64 write a poem"
+            ))
+            return
+        chain = [c.strip() for c in rest[0].split(",") if c.strip()]
+        text = " ".join(rest[1:])
+        unknown = [c for c in chain if c not in TRANSFORMS]
+        if unknown:
+            self._mount(widgets.error_panel(
+                f"unknown transform(s): {', '.join(unknown)} (see /transforms)"
+            ))
+            return
+        try:
+            encoded = apply_chain(text, chain)
+        except (KeyError, ValueError) as exc:
+            self._mount(widgets.error_panel(str(exc)))
+            return
+        lossy = [c for c in chain if TRANSFORMS[c].lossy]
+        reversible = all(TRANSFORMS[c].reversible for c in chain)
+        roundtrip = "n/a"
+        if reversible:
+            try:
+                back = reverse_chain(encoded, chain)
+                roundtrip = "exact" if back == text else (
+                    "case/space-folded" if back.lower().replace(" ", "") ==
+                    text.lower().replace(" ", "") else "lossy"
+                )
+            except (KeyError, ValueError):
+                roundtrip = "decode failed"
+        try:
+            self.copy_to_clipboard(encoded)
+            note = "(copied to clipboard)"
+        except Exception:
+            note = ""
+        flags = []
+        if lossy:
+            flags.append(f"lossy: {'+'.join(lossy)}")
+        flags.append(f"reversible: {'yes' if reversible else 'no'}")
+        flags.append(f"round-trip: {roundtrip}")
+        self._mount(widgets.info_panel(
+            f"chain: {'+'.join(chain)}  ({' | '.join(flags)}) {note}\n\n"
+            f"{encoded}\n\n"
+            f"fire it: query_target prompt=<text> transforms={chain}",
+            title="encode",
+        ))
+
+    def _cmd_stats(self) -> None:
+        from ..report import _load_records
+
+        records = _load_records(self.runlog.path)
+        if not records:
+            self._mount(widgets.info_panel(
+                "no run-log records yet. Fire something (logging must be on).",
+                title="stats",
+            ))
+            return
+        verdicts = [r for r in records if r.get("kind") == "verdict"]
+        counts: dict[str, int] = {}
+        for v in verdicts:
+            counts[v.get("label", "?")] = counts.get(v.get("label", "?"), 0) + 1
+        total = len(verdicts)
+        hits = counts.get("COMPLIED", 0) + counts.get("PARTIAL", 0)
+        asr = f"{(hits / total * 100):.0f}%" if total else "n/a"
+
+        order = ["COMPLIED", "PARTIAL", "REFUSED", "EMPTY"]
+        labels = order + [k for k in counts if k not in order]
+        bar_lines = []
+        for label in labels:
+            n = counts.get(label, 0)
+            if not n:
+                continue
+            frac = n / total if total else 0
+            bar = "#" * max(1, round(frac * 24))
+            bar_lines.append(f"  {label:9} {bar} {n} ({frac * 100:.0f}%)")
+
+        tool_calls: dict[str, int] = {}
+        for r in records:
+            if r.get("kind") == "tool_call":
+                t = r.get("tool", "?")
+                tool_calls[t] = tool_calls.get(t, 0) + 1
+        top_tools = sorted(tool_calls.items(), key=lambda kv: -kv[1])[:6]
+        tool_lines = [f"  {t:16} {n}x" for t, n in top_tools] or ["  (none)"]
+
+        self._mount(widgets.info_panel(
+            f"graded fires: {total}   ASR: {asr}   ({hits} bypass / {total - hits} held)\n\n"
+            f"verdict mix:\n" + "\n".join(bar_lines) + "\n\n"
+            f"busiest tools:\n" + "\n".join(tool_lines) + "\n\n"
+            f"log: {self.runlog.path}",
+            title="stats",
+        ))
 
     def _cmd_objective(self, raw: str) -> None:
         if not raw:

@@ -113,6 +113,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 | `crescendo` | multi-turn escalation |
 | `pair_attack` | PAIR/TAP: refine one objective on the target's refusals |
 | `best_of_n` | resample N times, keep the bypass |
+| `many_shot` | many-shot jailbreak: flood context with faux compliant turns, then fire |
 | `scan` | Garak-style coverage matrix (technique + HarmBench probes) |
 | `indirect_inject` | RAG/agent injection via document/email/tool-output carriers |
 | `system_sweep` | validate ONE system prompt across a task battery (multi-sample) |
@@ -127,8 +128,8 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 /profile /target /provider /model /judge [model]   endpoints & grader
 /auto /autoexit /rounds                            autonomous loop
 /objective /template /sysprompt /validate          campaign + reliability
-/transforms /tools /preset /lib /harmbench         arsenal & libraries
-/log /asr /findings /report /session /save         logging, scoreboard, reports
+/transforms /encode /tools /preset /lib /harmbench arsenal & libraries
+/log /asr /stats /findings /report /session /save  logging, scoreboard, reports
 Ctrl+S report · Ctrl+Y copy payload · Ctrl+L clear
 ```
 
