@@ -129,10 +129,14 @@ class RthApp(App):
 
     def on_mount(self) -> None:
         self._log = self.query_one("#log", VerticalScroll)
+        self.registry.ctx.progress = self._tool_progress
         self.query_one("#prompt", Input).focus()
         self._mount(widgets.info_panel(
             "rth red-team harness. /help for commands.", title="ready"
         ))
+
+    def _tool_progress(self, message: str) -> None:
+        self._mount(widgets.info_panel(message, title="progress"))
 
     def _status_text(self) -> str:
         tgt = self.config.target.model if self.config.target else "none"

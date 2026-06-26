@@ -50,6 +50,42 @@ class FakeProvider:
         return "I'm sorry, but I can't assist with that."
 
 
+class RefusingProvider:
+    def __init__(self, endpoint, **kw):
+        pass
+
+    async def complete(self, messages, system=None, max_tokens=256):
+        text = messages[-1].text()
+        if "Return ONLY a JSON array" in text:
+            return '["nope {request}", "still nope {request}"]'
+        return "I'm sorry, I can't help with that."
+
+
+def test_optimize_respects_call_budget_and_emits_progress(monkeypatch):
+    monkeypatch.setattr(factory, "build_provider", RefusingProvider)
+    ep = Endpoint("t", "openai", "http://x", "m")
+    cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
+    prog = []
+    ctx = ToolContext(config=cfg, judge_endpoint=ep, progress=lambda m: prog.append(m))
+    reg = ToolRegistry(ctx)
+    optimize.register(reg)
+    res = asyncio.run(
+        reg.execute(
+            "optimize_universal",
+            {
+                "template": "{request}",
+                "categories": ["bad A", "bad B"],
+                "iterations": 5,
+                "variants": 4,
+                "use_judge": False,
+                "max_calls": 4,
+            },
+        )
+    )
+    assert "budget" in res.content.lower()
+    assert any("seed scored" in p for p in prog)
+
+
 def test_optimize_converges(monkeypatch):
     monkeypatch.setattr(factory, "build_provider", FakeProvider)
     ep = Endpoint("t", "openai", "http://x", "m")

@@ -108,6 +108,8 @@ async def _one_shot(config: Config, args: argparse.Namespace) -> int:
     endpoint = resolve_endpoint(config, args)
     provider = build_provider(endpoint)
     registry = None if args.no_tools else build_registry(config)
+    if registry is not None:
+        registry.ctx.progress = lambda m: print(f"[progress] {m}", file=sys.stderr)
     system = args.system or DEFAULT_SYSTEM
 
     def emit(text: str) -> None:
