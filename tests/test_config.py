@@ -29,3 +29,17 @@ def test_resolved_key_from_env(monkeypatch):
     monkeypatch.setenv("SOME_KEY", "secret-123")
     ep = Endpoint("t", "openai", "http://x", "m", api_key_env="SOME_KEY")
     assert ep.require_key() == "secret-123"
+
+
+def test_apply_target_overrides_model_and_profile():
+    from argparse import Namespace
+
+    from rtharness.cli import apply_target_overrides
+
+    cfg = load_config("config.example.toml")
+    apply_target_overrides(cfg, Namespace(target="zai", target_model=None))
+    assert cfg.target.protocol == "anthropic" and cfg.target.model == "glm-4.6"
+
+    apply_target_overrides(cfg, Namespace(target=None, target_model="x-ai/grok-2"))
+    assert cfg.target.model == "x-ai/grok-2"
+    assert cfg.target.base_url == "https://api.z.ai/api/anthropic"

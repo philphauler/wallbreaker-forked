@@ -59,7 +59,28 @@ def build_main_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--rounds", type=int, default=12, help="Autonomous round cap (default 12)"
     )
+    parser.add_argument(
+        "--target", help="Target profile name to attack (overrides [target])"
+    )
+    parser.add_argument(
+        "--target-model", help="Model id to attack on the target endpoint"
+    )
     return parser
+
+
+def apply_target_overrides(config: Config, args: argparse.Namespace) -> None:
+    import dataclasses
+
+    if getattr(args, "target", None):
+        if args.target in config.profiles:
+            config.target = dataclasses.replace(
+                config.profiles[args.target], name="target"
+            )
+    if getattr(args, "target_model", None):
+        base = config.target or config.profile()
+        config.target = dataclasses.replace(
+            base, name="target", model=args.target_model
+        )
 
 
 def build_sub_parser() -> argparse.ArgumentParser:
@@ -140,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_main_parser().parse_args(raw)
     try:
         config = load_config(args.config)
+        apply_target_overrides(config, args)
     except ConfigError as exc:
         print(f"[config error] {exc}", file=sys.stderr)
         return 1

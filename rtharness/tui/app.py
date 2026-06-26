@@ -24,7 +24,7 @@ HELP_TEXT = """Slash commands:
 /retry                regenerate the response to your last message
 /undo                 remove your last message and its response
 /profile [name]       show or switch the active profile
-/target [name]        show target, or set it from a profile name
+/target [name|model-id]   pick the model to attack (profile, or a raw model id)
 /model <id>           override the active model id
 /auto [on|off]        toggle autonomous loop (keeps attacking until done)
 /autoexit [on|off]    when the agent calls finish(), close the tool (default on)
@@ -464,17 +464,44 @@ class RthApp(App):
     def _cmd_target(self, rest: list[str]) -> None:
         if not rest:
             t = self.config.target
-            msg = f"{t.model} @ {t.base_url}" if t else "no target configured"
-            self._mount(widgets.info_panel(msg, title="target"))
+            avail = ", ".join(self.config.profiles)
+            msg = (
+                f"attacking: {t.model} @ {t.base_url}" if t else "no target configured"
+            )
+            self._mount(widgets.info_panel(
+                f"{msg}\n\nset with:\n"
+                f"  /target <profile>     use a profile's endpoint+model ({avail})\n"
+                f"  /target model <id>    keep endpoint, swap the model id\n"
+                f"  /target <model-id>    same, e.g. /target anthropic/claude-3.7-sonnet",
+                title="target",
+            ))
+            return
+        if rest[0].lower() == "model":
+            if len(rest) < 2:
+                self._mount(widgets.error_panel("usage: /target model <id>"))
+                return
+            self._set_target_model(rest[1])
             return
         name = rest[0]
-        if name not in self.config.profiles:
-            self._mount(widgets.error_panel(f"no profile '{name}'"))
+        if name in self.config.profiles:
+            src = self.config.profiles[name]
+            self.config.target = dataclasses.replace(src, name="target")
+            self._refresh_status()
+            self._mount(widgets.info_panel(
+                f"target set to profile '{name}': {src.model} @ {src.base_url}",
+                title="target",
+            ))
             return
-        src = self.config.profiles[name]
-        self.config.target = dataclasses.replace(src, name="target")
+        self._set_target_model(name)
+
+    def _set_target_model(self, model_id: str) -> None:
+        base = self.config.target or self.endpoint
+        self.config.target = dataclasses.replace(base, name="target", model=model_id)
         self._refresh_status()
-        self._mount(widgets.info_panel(f"target set to {name}", title="target"))
+        self._mount(widgets.info_panel(
+            f"target model -> {model_id} @ {self.config.target.base_url}",
+            title="target",
+        ))
 
     def _cmd_model(self, rest: list[str]) -> None:
         if not rest:
