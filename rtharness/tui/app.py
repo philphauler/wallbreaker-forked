@@ -32,6 +32,8 @@ HELP_TEXT = """Slash commands:
 /transforms           list Parseltongue transforms
 /preset [list|name]   curated jailbreak seed templates (copies to clipboard)
 /objective [text]     set the engagement goal (threaded into the run + report)
+/template set <text>  hold a working template ({request} placeholder) to hand-iterate
+/template fire <cat>  fill {request}=<cat>, fire at target, auto-judge (set/save/clear too)
 /lib [list|update|MODEL]   browse the L1B3RT4S library
 /log [on|off]         toggle the JSONL run log (every payload + verdict)
 /judge [on|off]       LLM judge verdicts on target replies (default on)
@@ -101,6 +103,7 @@ class RthApp(App):
         self.judge_model_override = prefs.get("judge_model")
         self._exit_summary: str | None = None
         self.objective = ""
+        self.template = ""
         self._state_path = state_path
         self._target_profile = prefs.get("target_profile")
         self._target_model = prefs.get("target_model")
@@ -517,6 +520,8 @@ class RthApp(App):
             ))
         elif cmd == "/objective":
             self._cmd_objective(raw_arg)
+        elif cmd == "/template":
+            self._cmd_template(parts[1:], raw_arg)
         elif cmd == "/findings":
             self._cmd_findings(rest)
         elif cmd == "/report":
@@ -700,6 +705,52 @@ class RthApp(App):
         self._mount(widgets.info_panel(
             f"{p.description} {note}\n\n{p.template}", title=f"preset: {p.name}"
         ))
+
+    def _cmd_template(self, rest: list[str], raw: str) -> None:
+        sub = rest[0].lower() if rest else "show"
+        body = raw[len(rest[0]):].strip() if rest else ""
+        if sub == "show" or not rest:
+            msg = self.template or "no template set. /template set <text with {request}>"
+            self._mount(widgets.info_panel(msg, title="template"))
+        elif sub == "set":
+            if "{request}" not in body:
+                self._mount(widgets.error_panel("template must contain a {request} placeholder"))
+                return
+            self.template = body
+            self._mount(widgets.info_panel(
+                f"template set ({len(body)} chars)\n\n{body[:400]}", title="template"
+            ))
+        elif sub == "clear":
+            self.template = ""
+            self._mount(widgets.info_panel("template cleared", title="template"))
+        elif sub == "save":
+            path = rest[1] if len(rest) > 1 else "template.txt"
+            try:
+                with open(path, "w", encoding="utf-8") as h:
+                    h.write(self.template)
+                self._mount(widgets.info_panel(f"template saved to {path}", title="template"))
+            except OSError as exc:
+                self._mount(widgets.error_panel(str(exc)))
+        elif sub == "fire":
+            if not self.template:
+                self._mount(widgets.error_panel("set a template first: /template set <text>"))
+                return
+            if not body:
+                self._mount(widgets.error_panel("usage: /template fire <category request>"))
+                return
+            if self._busy:
+                self._mount(widgets.error_panel("agent is working; wait"))
+                return
+            self.run_worker(self._template_fire(body), group="judge", exclusive=False)
+        else:
+            self._mount(widgets.error_panel("usage: /template [show|set|fire|save|clear]"))
+
+    async def _template_fire(self, category: str) -> None:
+        payload = self.template.replace("{request}", category)
+        self._last_payload = payload
+        self._mount(widgets.tool_call_panel("template fire", {"category": category}))
+        res = await self.registry.execute("query_target", {"prompt": payload})
+        self._on_tool_result("manual", "query_target", res.content, res.is_error)
 
     def _cmd_objective(self, raw: str) -> None:
         if not raw:
