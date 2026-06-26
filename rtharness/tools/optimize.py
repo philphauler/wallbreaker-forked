@@ -108,7 +108,14 @@ async def _optimize(args: dict, ctx: ToolContext) -> str:
     if ctx.config.target is None:
         return "Error: no [target] endpoint configured."
 
-    categories = args.get("categories") or DEFAULT_CATEGORIES
+    categories = args.get("categories")
+    if not categories:
+        from .. import harmbench
+
+        hb = await harmbench.battery(n=5)
+        categories = hb or DEFAULT_CATEGORIES
+        if hb:
+            ctx.emit("categories: HarmBench balanced sample (unbiased)")
     iterations = int(args.get("iterations", 2))
     variants = int(args.get("variants", 3))
     use_judge = bool(args.get("use_judge", True))

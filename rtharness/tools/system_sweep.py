@@ -24,7 +24,14 @@ async def _system_sweep(args: dict, ctx: ToolContext) -> str:
         return "Error: 'system' is required (the ONE fixed system prompt to validate)"
     if ctx.config.target is None:
         return "Error: no [target] endpoint configured."
-    tasks = args.get("tasks") or DEFAULT_CYBER_TASKS
+    tasks = args.get("tasks")
+    if not tasks:
+        from .. import harmbench
+
+        hb = await harmbench.battery(category="cybercrime_intrusion", n=8)
+        tasks = hb or DEFAULT_CYBER_TASKS
+        if hb:
+            ctx.emit("tasks: HarmBench cybercrime_intrusion sample (unbiased)")
     max_tokens = int(args.get("max_tokens", 500))
 
     from ..providers.factory import build_provider

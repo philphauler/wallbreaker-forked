@@ -37,6 +37,7 @@ HELP_TEXT = """Slash commands:
 /template test [a;b]  fire the template across a category battery, scoreboard
 /sysprompt set <text> hold ONE fixed system prompt; /sysprompt test sweeps tasks through it
 /lib [list|update|MODEL]   browse the L1B3RT4S library
+/harmbench [category]      standardized HarmBench behavior prompts (unbiased battery)
 /log [on|off]         toggle the JSONL run log (every payload + verdict)
 /judge [on|off]       LLM judge verdicts on target replies (default on)
 /judge model <id>     swap the judge model live (/judge default to reset)
@@ -509,6 +510,8 @@ class RthApp(App):
             self._cmd_preset(rest)
         elif cmd == "/lib":
             self.run_worker(self._cmd_lib(rest), exclusive=False)
+        elif cmd == "/harmbench":
+            self.run_worker(self._cmd_harmbench(rest), exclusive=False)
         elif cmd == "/log":
             self._cmd_log(rest)
         elif cmd == "/judge":
@@ -673,6 +676,16 @@ class RthApp(App):
             f"file: {self.runlog.path}",
             title="log",
         ))
+
+    async def _cmd_harmbench(self, rest: list[str]) -> None:
+        action = rest[0] if rest else "categories"
+        if action == "categories":
+            out = await self.registry.execute("harmbench", {"action": "categories"})
+        else:
+            out = await self.registry.execute(
+                "harmbench", {"action": "sample", "category": action, "n": 10}
+            )
+        self._mount(widgets.info_panel(out.content, title="harmbench"))
 
     async def _cmd_lib(self, rest: list[str]) -> None:
         from ..tools import l1b3rt4s as lib
