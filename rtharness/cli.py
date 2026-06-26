@@ -72,18 +72,34 @@ def build_sub_parser() -> argparse.ArgumentParser:
 
 
 async def _one_shot(config: Config, args: argparse.Namespace) -> int:
+    from .agent.loop import AgentEvents, run_turn
     from .agent.messages import user
+    from .prompts import DEFAULT_SYSTEM
     from .providers.factory import build_provider
+    from .tools import build_registry
 
     endpoint = resolve_endpoint(config, args)
     provider = build_provider(endpoint)
-    from .agent.messages import TextDelta
+    registry = None if args.no_tools else build_registry(config)
+    system = args.system or DEFAULT_SYSTEM
+
+    def emit(text: str) -> None:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    events = AgentEvents(
+        on_text=emit,
+        on_tool_start=lambda _i, n, a: print(f"\n[tool {n} {a}]", file=sys.stderr),
+        on_tool_result=lambda _i, n, c, e: print(
+            f"[{n} -> {'error' if e else 'ok'}]", file=sys.stderr
+        ),
+        on_error=lambda m: print(f"\n[error] {m}", file=sys.stderr),
+    )
 
     try:
-        async for event in provider.stream([user(args.prompt)], max_tokens=4096):
-            if isinstance(event, TextDelta):
-                sys.stdout.write(event.text)
-                sys.stdout.flush()
+        await run_turn(
+            provider, registry, [user(args.prompt)], system=system, events=events
+        )
     except ProviderError as exc:
         print(f"\n[provider error] {exc}", file=sys.stderr)
         return 1
