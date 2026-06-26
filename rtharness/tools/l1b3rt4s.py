@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import subprocess
 from pathlib import Path
 
@@ -59,15 +60,24 @@ def _find_file(name: str) -> Path | None:
 
 
 def search(query: str) -> list[tuple[str, int, str]]:
-    hits: list[tuple[str, int, str]] = []
-    q = query.lower()
+    raw = query.lower().strip()
+    tokens = [t for t in re.split(r"[^a-z0-9]+", raw) if len(t) >= 3]
+    scored: list[tuple[int, str, int, str]] = []
     for p in sorted(library_dir().glob("*.mkd")):
-        for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-            if q in line.lower():
-                hits.append((p.stem, i, line.strip()[:200]))
-                if len(hits) >= MAX_SEARCH_HITS:
-                    return hits
-    return hits
+        for i, line in enumerate(
+            p.read_text(encoding="utf-8", errors="replace").splitlines(), 1
+        ):
+            low = line.lower()
+            if raw and raw in low:
+                score = 100 + len(tokens)
+            elif tokens:
+                score = sum(1 for t in tokens if t in low)
+            else:
+                score = 0
+            if score > 0:
+                scored.append((score, p.stem, i, line.strip()[:200]))
+    scored.sort(key=lambda h: -h[0])
+    return [(m, n, text) for _s, m, n, text in scored[:MAX_SEARCH_HITS]]
 
 
 async def _list_tool(args: dict, ctx: ToolContext) -> str:
@@ -87,7 +97,12 @@ async def _search_tool(args: dict, ctx: ToolContext) -> str:
         return msg
     hits = search(query)
     if not hits:
-        return f"No matches for '{query}'."
+        models = ", ".join(list_models())
+        return (
+            f"No matches for '{query}'. Search is keyword-based, not phrase-based - try "
+            f"single terms like 'godmode', 'jailbreak', 'persona', 'DAN', 'system'. "
+            f"Or pull a model file directly with l1b3rt4s_get. Available files: {models}"
+        )
     return "\n".join(f"{m}.mkd:{n}: {text}" for m, n, text in hits)
 
 
@@ -116,7 +131,12 @@ def register(registry: ToolRegistry) -> None:
     )
     registry.add(
         name="l1b3rt4s_search",
-        description="Search the L1B3RT4S jailbreak library for a keyword across all model files.",
+        description=(
+            "Keyword-search the L1B3RT4S jailbreak library across all model files. "
+            "Matches ANY word in your query and ranks by how many words hit, so short "
+            "keyword queries work best (e.g. 'godmode persona'). Returns ranked line "
+            "matches; on a miss it suggests terms and lists the available files."
+        ),
         parameters={
             "type": "object",
             "properties": {"query": {"type": "string"}},
