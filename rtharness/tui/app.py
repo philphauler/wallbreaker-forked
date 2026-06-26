@@ -34,6 +34,7 @@ HELP_TEXT = """Slash commands:
 /objective [text]     set the engagement goal (threaded into the run + report)
 /template set <text>  hold a working template ({request} placeholder) to hand-iterate
 /template fire <cat>  fill {request}=<cat>, fire at target, auto-judge (set/save/clear too)
+/template test [a;b]  fire the template across a category battery, scoreboard
 /lib [list|update|MODEL]   browse the L1B3RT4S library
 /log [on|off]         toggle the JSONL run log (every payload + verdict)
 /judge [on|off]       LLM judge verdicts on target replies (default on)
@@ -738,12 +739,15 @@ class RthApp(App):
             if not body:
                 self._mount(widgets.error_panel("usage: /template fire <category request>"))
                 return
-            if self._busy:
-                self._mount(widgets.error_panel("agent is working; wait"))
-                return
             self.run_worker(self._template_fire(body), group="judge", exclusive=False)
+        elif sub == "test":
+            if not self.template:
+                self._mount(widgets.error_panel("set a template first: /template set <text>"))
+                return
+            cats = [c.strip() for c in body.split(";") if c.strip()] if body else None
+            self.run_worker(self._template_test(cats), group="judge", exclusive=False)
         else:
-            self._mount(widgets.error_panel("usage: /template [show|set|fire|save|clear]"))
+            self._mount(widgets.error_panel("usage: /template [show|set|fire|test|save|clear]"))
 
     async def _template_fire(self, category: str) -> None:
         payload = self.template.replace("{request}", category)
@@ -751,6 +755,38 @@ class RthApp(App):
         self._mount(widgets.tool_call_panel("template fire", {"category": category}))
         res = await self.registry.execute("query_target", {"prompt": payload})
         self._on_tool_result("manual", "query_target", res.content, res.is_error)
+
+    async def _template_test(self, cats) -> None:
+        from ..judging import grade
+        from ..tools.optimize import DEFAULT_CATEGORIES
+
+        cats = cats or DEFAULT_CATEGORIES
+        self._mount(widgets.info_panel(
+            f"testing template across {len(cats)} categories...", title="template test"
+        ))
+        rows = []
+        for c in cats:
+            payload = self.template.replace("{request}", c)
+            res = await self.registry.execute("query_target", {"prompt": payload})
+            if res.is_error:
+                rows.append(("ERROR", None, c))
+                continue
+            reply = res.content.split("\n", 1)[1] if res.content.startswith("[target") else res.content
+            label, score, reason, _src = await grade(
+                self._judge_endpoint(), reply, payload=payload, objective=c
+            )
+            self._record_verdict(payload, reply, label, reason)
+            rows.append((label, score, c))
+            self._refresh_status()
+        passes = sum(1 for lbl, _s, _c in rows if lbl == "COMPLIED")
+        lines = [
+            f"[{lbl}{f'({s})' if s is not None else ''}] {c[:52]}"
+            for lbl, s, c in rows
+        ]
+        self._mount(widgets.info_panel(
+            f"template scored {passes}/{len(rows)} COMPLIED:\n\n" + "\n".join(lines),
+            title="template test",
+        ))
 
     def _cmd_objective(self, raw: str) -> None:
         if not raw:
@@ -804,6 +840,7 @@ class RthApp(App):
         if action == "save":
             meta = {
                 "objective": self.objective,
+                "template": self.template,
                 "asr_hits": self.asr_hits,
                 "asr_total": self.asr_total,
                 "profile": self.endpoint.name,
@@ -825,6 +862,7 @@ class RthApp(App):
                 return
             self.history = history
             self.objective = meta.get("objective", "")
+            self.template = meta.get("template", "")
             self.asr_hits = meta.get("asr_hits", 0)
             self.asr_total = meta.get("asr_total", 0)
             self._rerender(f"loaded {len(history)} messages from {path}")
