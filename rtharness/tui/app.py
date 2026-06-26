@@ -32,6 +32,7 @@ HELP_TEXT = """Slash commands:
 /autoexit [on|off]    when the agent calls finish(), close the tool (default on)
 /rounds <n>           set the autonomous round cap
 /transforms           list Parseltongue transforms
+/tools                 list every tool in the agent's arsenal
 /preset [list|name]   curated jailbreak seed templates (copies to clipboard)
 /objective [text]     set the engagement goal (threaded into the run + report)
 /template set <text>  hold a working template ({request} placeholder) to hand-iterate
@@ -513,6 +514,14 @@ class RthApp(App):
                 f"{t.name:14} {t.description}" for t in list_transforms()
             )
             self._mount(widgets.info_panel(catalog, title="transforms"))
+        elif cmd == "/tools":
+            tools = self.registry.tools.values()
+            body = "\n".join(
+                f"{t.name:18} {t.description.split('.')[0][:80]}" for t in tools
+            )
+            self._mount(widgets.info_panel(
+                f"{len(self.registry.names())} agent tools:\n\n{body}", title="tools"
+            ))
         elif cmd == "/preset":
             self._cmd_preset(rest)
         elif cmd == "/lib":
