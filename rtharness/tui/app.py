@@ -46,6 +46,7 @@ HELP_TEXT = """Slash commands:
 /sysprompt set <text> hold ONE fixed system prompt (or /sysprompt load <file|seed> for a raw persona)
 /sysprompt test [prefill] [samples=N]   sweep the held prompt across a HarmBench battery
 /lib [list|update|MODEL]   browse the L1B3RT4S library
+/parsel [list|search q|inspect K|guide]   browse the P4RS3LT0NGV3 transform catalog (222)
 /eni [list|search q|MODEL] browse the ENI persona-jailbreak collection
 /seedsweep <request>       fire one request through many ENI+L1B3RT4S seeds, rank bypasses
 /pairsweep [category] [n]   run PAIR (your highest-ASR loop) across a whole battery, concurrent
@@ -90,7 +91,7 @@ mid-engagement (e.g. "try the GLM ENI seed", "drop the encoding, go fiction-fram
 KNOWN_COMMANDS = (
     "/help", "/edit", "/retry", "/regen", "/undo", "/clear", "/profile", "/target",
     "/provider", "/validate", "/replay", "/model", "/auto", "/autoexit", "/rounds",
-    "/transforms", "/encode", "/diff", "/tools", "/preset", "/lib", "/eni", "/harmbench",
+    "/transforms", "/encode", "/diff", "/tools", "/preset", "/lib", "/parsel", "/eni", "/harmbench",
     "/campaign", "/leaderboard", "/seedsweep", "/pairsweep", "/narrate", "/fire", "/push",
     "/adapt", "/firefile", "/find", "/leakscan", "/log", "/judge", "/asr", "/stats",
     "/regrade",
@@ -136,6 +137,7 @@ class RthApp(App):
         self.system = system
         self.provider = build_provider(endpoint)
         self.registry = build_registry(config)
+        self._mcp_bridge = None
         self.history = []
         self.max_tokens = 4096
         self.auto = bool(prefs.get("auto", True))
@@ -230,12 +232,34 @@ class RthApp(App):
         self.registry.ctx.record = self._tool_verdict
         self._sync_judge_endpoint()
         self.query_one("#prompt", Input).focus()
+        if self.config.mcp_servers:
+            self.run_worker(self._attach_mcp(), exclusive=False, group="mcp")
         if self._resume_path:
             self._resume_session(self._resume_path)
         else:
             self._mount(widgets.info_panel(
                 "rth red-team harness. /help for commands.", title="ready"
             ))
+
+    async def _attach_mcp(self) -> None:
+        from ..tools.mcp_bridge import attach_mcp_servers
+
+        def note(msg: str) -> None:
+            self._mount(widgets.info_panel(msg, title="mcp"))
+
+        try:
+            self._mcp_bridge = await attach_mcp_servers(
+                self.registry, self.config, progress=note
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._mount(widgets.error_panel(f"mcp attach failed: {exc}"))
+
+    async def on_unmount(self) -> None:
+        if self._mcp_bridge is not None:
+            try:
+                await self._mcp_bridge.aclose()
+            except Exception:  # noqa: BLE001
+                pass
 
     def _resume_session(self, path) -> None:
         from ..session import load_session
@@ -696,6 +720,8 @@ class RthApp(App):
             self._cmd_preset(rest)
         elif cmd == "/lib":
             self.run_worker(self._cmd_lib(rest), exclusive=False)
+        elif cmd == "/parsel":
+            self.run_worker(self._cmd_parsel(rest), exclusive=False)
         elif cmd == "/eni":
             self.run_worker(self._cmd_eni(rest), exclusive=False)
         elif cmd == "/seedsweep":
@@ -1089,6 +1115,38 @@ class RthApp(App):
         else:
             out = await self.registry.execute("l1b3rt4s_get", {"model": action})
             self._mount(widgets.info_panel(out.content, title=f"lib:{action}"))
+
+    async def _cmd_parsel(self, rest: list[str]) -> None:
+        if "parsel_list" not in self.registry.tools:
+            self._mount(widgets.error_panel(
+                "P4RS3LT0NGV3 tools aren't connected. Add an [[mcp.servers]] block for "
+                "parsel to config.toml (see config.example.toml) and restart."
+            ))
+            return
+        action = rest[0].lower() if rest else "list"
+        if action == "list":
+            out = await self.registry.execute("parsel_list", {"category": " ".join(rest[1:])})
+            self._mount(widgets.info_panel(out.content, title="parsel"))
+        elif action == "guide":
+            out = await self.registry.execute("parsel_guide", {})
+            self._mount(widgets.info_panel(out.content, title="parsel:guide"))
+        elif action == "search":
+            query = " ".join(rest[1:])
+            if not query:
+                self._mount(widgets.error_panel("usage: /parsel search <query>"))
+                return
+            out = await self.registry.execute("parsel_search", {"query": query})
+            self._mount(widgets.info_panel(out.content, title="parsel:search"))
+        elif action == "inspect":
+            name = " ".join(rest[1:])
+            if not name:
+                self._mount(widgets.error_panel("usage: /parsel inspect <transform>"))
+                return
+            out = await self.registry.execute("parsel_inspect", {"transform": name})
+            self._mount(widgets.info_panel(out.content, title=f"parsel:{name}"))
+        else:
+            out = await self.registry.execute("parsel_inspect", {"transform": " ".join(rest)})
+            self._mount(widgets.info_panel(out.content, title=f"parsel:{action}"))
 
     async def _cmd_eni(self, rest: list[str]) -> None:
         action = rest[0] if rest else "list"

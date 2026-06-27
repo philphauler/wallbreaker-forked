@@ -12,6 +12,7 @@ dependencies = [
     "httpx>=0.27",
     "textual>=0.79",
     "rich>=13.7",
+    "mcp>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -27,9 +28,10 @@ barcodes = [
 
 [project.scripts]
 rth = "rtharness.cli:main"
+p4rs3lt0ngv3-mcp = "p4rs3lt0ngv3_mcp.server:main"
 
 [tool.setuptools.packages.find]
-include = ["rtharness*"]
+include = ["rtharness*", "p4rs3lt0ngv3_mcp*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

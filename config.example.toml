@@ -42,3 +42,15 @@ protocol = "openai"
 base_url = "https://openrouter.ai/api/v1"
 api_key_env = "OPENROUTER_API_KEY"
 model = "openai/gpt-4o-mini"
+
+# MCP servers. Each enabled server is spawned over stdio at startup and its tools are
+# proxied into the agent's tool registry (so the model can call them directly). The
+# bundled P4RS3LT0NGV3 server exposes all 222 transforms + the universal decoder; it needs
+# Node.js on PATH and the repo vendored via `rth parsel update`.
+[[mcp.servers]]
+name = "parsel"
+command = "python"
+args = ["-m", "p4rs3lt0ngv3_mcp"]
+enabled = true
+# tool_prefix = ""          # tools are already namespaced parsel_*
+# env = { PARSEL_REPO = "/abs/path/to/P4RS3LT0NGV3" }   # override the vendored repo location

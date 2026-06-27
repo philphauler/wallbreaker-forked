@@ -36,7 +36,7 @@ def _add_endpoint_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--api-key", help="API key literal (prefer --api-key-env)")
 
 
-SUBCOMMANDS = ("lib", "eni", "transform", "findings", "report", "export", "check", "regrade")
+SUBCOMMANDS = ("lib", "parsel", "eni", "transform", "findings", "report", "export", "check", "regrade")
 
 
 def build_main_parser() -> argparse.ArgumentParser:
@@ -96,6 +96,11 @@ def build_sub_parser() -> argparse.ArgumentParser:
     lib = sub.add_parser("lib", help="Manage the L1B3RT4S jailbreak library")
     lib.add_argument("lib_action", choices=["update", "list", "path"])
 
+    parsel = sub.add_parser(
+        "parsel", help="Manage the P4RS3LT0NGV3 transform library (MCP server backend)"
+    )
+    parsel.add_argument("parsel_action", choices=["update", "list", "path"])
+
     eni = sub.add_parser("eni", help="Browse the ENI persona-jailbreak collection")
     eni.add_argument("eni_action", choices=["list", "update", "path"])
 
@@ -150,6 +155,13 @@ async def _one_shot(config: Config, args: argparse.Namespace) -> int:
             lambda p, r, lbl, rs, t: runlog.verdict(p, r, lbl, rs, t)
         )
         runlog.event("objective", text=args.prompt)
+    mcp_bridge = None
+    if registry is not None:
+        from .tools.mcp_bridge import attach_mcp_servers
+
+        mcp_bridge = await attach_mcp_servers(
+            registry, config, progress=lambda m: print(f"[{m}]", file=sys.stderr)
+        )
     system = args.system or DEFAULT_SYSTEM
 
     def emit(text: str) -> None:
@@ -182,6 +194,9 @@ async def _one_shot(config: Config, args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(f"\n[provider error] {exc}", file=sys.stderr)
         return 1
+    finally:
+        if mcp_bridge is not None:
+            await mcp_bridge.aclose()
     print()
     if registry is not None and runlog._started:
         print(f"[run log] {runlog.path} (rth report / rth export to summarize)", file=sys.stderr)
@@ -202,6 +217,10 @@ def main(argv: list[str] | None = None) -> int:
             from .tools.eni import run_eni_cli
 
             return run_eni_cli(args)
+        if args.command == "parsel":
+            from .tools.parsel_lib import run_parsel_cli
+
+            return run_parsel_cli(args)
         if args.command in ("findings", "report", "export"):
             from .report import resolve_log_path
 

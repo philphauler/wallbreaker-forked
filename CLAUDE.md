@@ -73,3 +73,16 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   `load_session` must detect `.jsonl` (or catch JSONDecodeError) and reconstruct via
   `load_run_log` (user/assistant records → history; tool blocks omitted), else
   `/session load <run log>` throws "Extra data: line 2".
+- **[parsel]**: the vendored P4RS3LT0NGV3's own Python CLI (`p4rs3lt0ngv3_cli`) is broken —
+  `bridge.list_transforms()` does `opt["id"]` and crashes (`KeyError`), so `list`/`agent`
+  traceback. Do NOT import that wrapper. Drive `scripts/cli_bridge.js` directly with JSON on
+  stdin (`{"command":"list|inspect|run|auto-decode", ...}`) — it loads transforms straight
+  from `src/transformers` via `loader-node.js` with ZERO npm install/build (no runtime deps),
+  so all 222 transforms work as soon as the repo is git-cloned. `p4rs3lt0ngv3_mcp/bridge.py`
+  is that self-contained caller.
+- **[mcp]**: harness is an MCP *client* now. anyio cancel scopes can't cross asyncio tasks,
+  so a stdio `ClientSession` opened in one task and closed/used from another raises on
+  teardown. `tools/mcp_bridge.py` runs each server's whole `stdio_client`+`ClientSession`
+  lifecycle inside ONE dedicated task and serves `call_tool` via an `asyncio.Queue` (futures
+  resolved in that task). Proxied tools degrade gracefully: a server that won't start is
+  skipped with a progress note, never breaking `build_registry`/startup.

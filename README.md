@@ -24,6 +24,10 @@ judge, and reliability validation.
   reproducibility.
 - **Parseltongue** — 43 chainable transforms (encodings, unicode fonts, stego, homoglyph,
   zero-width, tag smuggling, bijection, gibberish…) plus `mutate` (LLM anti-classifier).
+- **P4RS3LT0NGV3 over MCP** — an optional MCP server wraps elder-plinius's upstream
+  Parseltongue: **all 222 transforms** (45 ciphers, runic/braille/symbol scripts, every
+  encoding, steganography) + a universal decoder, exposed as `parsel_*` tools the agent
+  drives directly. Any `[[mcp.servers]]` you configure is proxied into the tool registry.
 - **Single-artifact convergence** — `/sysprompt` + `system_sweep` + `optimize_universal`
   converge on ONE universal system prompt; they can't split into variant toolkits.
 
@@ -70,6 +74,31 @@ api_key  = "sk-or-..."
 model    = "openai/gpt-4o-mini"
 ```
 
+### MCP servers (optional)
+
+The harness is an MCP client: every `[[mcp.servers]]` you declare is spawned over stdio at
+startup and its tools are proxied into the agent's registry. The bundled **P4RS3LT0NGV3**
+server exposes the full upstream transform catalog. One-time setup:
+
+```bash
+rth parsel update        # git-clone elder-plinius/P4RS3LT0NGV3 into library/ (needs Node.js)
+rth parsel list          # sanity-check: prints all 222 transforms by category
+```
+
+```toml
+[[mcp.servers]]
+name    = "parsel"
+command = "python"
+args    = ["-m", "p4rs3lt0ngv3_mcp"]
+enabled = true
+# tool_prefix = "p_"                                  # optional namespace for the proxied tools
+# env = { PARSEL_REPO = "/abs/path/to/P4RS3LT0NGV3" } # override the vendored repo location
+```
+
+No `npm install`/build is needed — the server drives the upstream Node bridge headlessly.
+In the TUI, `/parsel guide|list|search <q>|inspect <key>` browses the catalog. The server is
+a standalone stdio MCP server, so any MCP client (Claude Code, Cursor) can use it too.
+
 ## Launch
 
 ```bash
@@ -112,6 +141,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 |------|---------|
 | `run_shell`, `read_file`, `write_file`, `edit_file` | build/run/save payloads |
 | `parseltongue`, `parseltongue_catalog`, `mutate` | obfuscate / anti-classifier rewrite |
+| `parsel_*` (MCP) | full P4RS3LT0NGV3 engine: `parsel_guide`/`list`/`search`/`inspect`/`transform`/`chain`/`decode` — 222 transforms + universal decoder |
 | `l1b3rt4s_*`, `eni_*` | jailbreak libraries: L1B3RT4S + the ENI persona collection |
 | `harmbench`, `preset` | unbiased behavior benchmark, curated seed templates |
 | `query_target` | fire at the model-under-test (with `transforms=[...]` to encode+fire) |
@@ -147,7 +177,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 /auto /autoexit /rounds                            autonomous loop
 /objective /template /sysprompt /validate /replay  campaign + reliability
 /transforms /encode /diff /campaign /leaderboard   arsenal, auto-sweep & benchmark
-/find /tools /preset /lib /eni /harmbench          search & libraries
+/find /tools /preset /lib /parsel /eni /harmbench  search & libraries
 /log /asr /stats /findings /repro /export /report  logging, scoreboard, repro, CI export
 Ctrl+S report · Ctrl+Y copy payload · Ctrl+T stats · Ctrl+R repro · Ctrl+L clear
 ```

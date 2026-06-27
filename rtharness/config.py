@@ -41,11 +41,28 @@ class Endpoint:
 
 
 @dataclass
+class MCPServer:
+    """A Model Context Protocol server the harness connects to over stdio.
+
+    Its tools are proxied into the agent's ToolRegistry by tools/mcp_bridge.py.
+    """
+
+    name: str
+    command: str
+    args: tuple[str, ...] = ()
+    env: dict[str, str] = field(default_factory=dict)
+    enabled: bool = True
+    tool_prefix: str = ""
+    cwd: str = ""
+
+
+@dataclass
 class Config:
     default_profile: str
     profiles: dict[str, Endpoint] = field(default_factory=dict)
     target: Endpoint | None = None
     judge: Endpoint | None = None
+    mcp_servers: list[MCPServer] = field(default_factory=list)
     path: Path | None = None
 
     def profile(self, name: str | None = None) -> Endpoint:
@@ -131,6 +148,41 @@ def _endpoint_from_table(name: str, table: dict) -> Endpoint:
     )
 
 
+def _mcp_server_from_table(table: dict) -> MCPServer:
+    name = str(table.get("name", "")).strip()
+    command = str(table.get("command", "")).strip()
+    if not name or not command:
+        raise ConfigError("Each [[mcp.servers]] needs a 'name' and a 'command'.")
+    raw_args = table.get("args", [])
+    if isinstance(raw_args, str):
+        args: tuple[str, ...] = (raw_args,)
+    elif isinstance(raw_args, list):
+        args = tuple(str(a) for a in raw_args)
+    else:
+        args = ()
+    env_table = table.get("env", {})
+    env = {str(k): str(v) for k, v in env_table.items()} if isinstance(env_table, dict) else {}
+    return MCPServer(
+        name=name,
+        command=command,
+        args=args,
+        env=env,
+        enabled=bool(table.get("enabled", True)),
+        tool_prefix=str(table.get("tool_prefix", "")),
+        cwd=str(table.get("cwd", "")),
+    )
+
+
+def _load_mcp_servers(data: dict) -> list[MCPServer]:
+    mcp_table = data.get("mcp", {})
+    if not isinstance(mcp_table, dict):
+        return []
+    servers = mcp_table.get("servers", [])
+    if not isinstance(servers, list):
+        return []
+    return [_mcp_server_from_table(s) for s in servers if isinstance(s, dict)]
+
+
 def find_config(start: Path | None = None) -> Path | None:
     here = (start or Path.cwd()).resolve()
     for directory in (here, *here.parents):
@@ -176,5 +228,6 @@ def load_config(path: str | Path | None = None) -> Config:
         profiles=profiles,
         target=target,
         judge=judge,
+        mcp_servers=_load_mcp_servers(data),
         path=config_path,
     )
