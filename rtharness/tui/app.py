@@ -43,7 +43,8 @@ HELP_TEXT = """Slash commands:
 /template set <text>  hold a working template ({request} placeholder) to hand-iterate
 /template fire <cat>  fill {request}=<cat>, fire at target, auto-judge (set/save/clear too)
 /template test [a;b]  fire the template across a category battery, scoreboard
-/sysprompt set <text> hold ONE fixed system prompt; /sysprompt test [prefill] sweeps tasks
+/sysprompt set <text> hold ONE fixed system prompt (or /sysprompt load <file|seed> for a raw persona)
+/sysprompt test [prefill] [samples=N]   sweep the held prompt across a HarmBench battery
 /lib [list|update|MODEL]   browse the L1B3RT4S library
 /eni [list|search q|MODEL] browse the ENI persona-jailbreak collection
 /seedsweep <request>       fire one request through many ENI+L1B3RT4S seeds, rank bypasses
@@ -1306,6 +1307,25 @@ class RthApp(App):
             self._mount(widgets.info_panel(
                 f"system prompt set ({len(body)} chars)\n\n{body[:400]}", title="sysprompt"
             ))
+        elif sub == "load":
+            ref = body.strip()
+            if not ref:
+                self._mount(widgets.error_panel("usage: /sysprompt load <file path or seed name>"))
+                return
+            from ..tools.fire_file import _read_source
+
+            label, content = _read_source(self.registry.ctx, ref)
+            if not content:
+                self._mount(widgets.error_panel(
+                    f"no file or seed '{ref}' (try a path, or a name like GROK_ENI)"
+                ))
+                return
+            self.sysprompt = content
+            self._mount(widgets.info_panel(
+                f"system prompt loaded from {label} ({len(content)} chars) — RAW, unmodified.\n"
+                f"now: /sysprompt test prefill samples=5\n\n{content[:300]}...",
+                title="sysprompt",
+            ))
         elif sub == "clear":
             self.sysprompt = ""
             self._mount(widgets.info_panel("system prompt cleared", title="sysprompt"))
@@ -1319,23 +1339,33 @@ class RthApp(App):
                 self._mount(widgets.error_panel(str(exc)))
         elif sub == "test":
             if not self.sysprompt:
-                self._mount(widgets.error_panel("set a system prompt first: /sysprompt set <text>"))
+                self._mount(widgets.error_panel("set or /sysprompt load a system prompt first"))
                 return
-            words = body.split()
-            prefill = bool(words and words[0].lower() == "prefill")
-            if prefill:
-                body = body[len(words[0]):].strip()
-            tasks = [t.strip() for t in body.split(";") if t.strip()] if body else None
-            self.run_worker(self._sysprompt_test(tasks, prefill), group="judge", exclusive=False)
+            prefill = False
+            samples = 1
+            rest_tokens = []
+            for w in body.split():
+                lw = w.lower()
+                if lw == "prefill":
+                    prefill = True
+                elif lw.startswith("samples=") and lw[8:].isdigit():
+                    samples = max(1, int(lw[8:]))
+                else:
+                    rest_tokens.append(w)
+            tasks_body = " ".join(rest_tokens)
+            tasks = [t.strip() for t in tasks_body.split(";") if t.strip()] if tasks_body else None
+            self.run_worker(self._sysprompt_test(tasks, prefill, samples), group="judge", exclusive=False)
         else:
-            self._mount(widgets.error_panel("usage: /sysprompt [show|set|test [prefill]|save|clear]"))
+            self._mount(widgets.error_panel("usage: /sysprompt [show|set|load|test [prefill] [samples=N]|save|clear]"))
 
-    async def _sysprompt_test(self, tasks, prefill: bool = False) -> None:
-        args = {"system": self.sysprompt}
+    async def _sysprompt_test(self, tasks, prefill: bool = False, samples: int = 1) -> None:
+        args: dict = {"system": self.sysprompt}
         if tasks:
             args["tasks"] = tasks
         if prefill:
             args["prefill"] = True
+        if samples > 1:
+            args["samples"] = samples
         res = await self.registry.execute("system_sweep", args)
         self._mount(widgets.info_panel(res.content, title="sysprompt sweep"))
         self._refresh_status()
