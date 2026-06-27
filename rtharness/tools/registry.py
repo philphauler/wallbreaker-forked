@@ -15,11 +15,22 @@ class ToolContext:
     cwd: str = "."
     judge_endpoint: Endpoint | None = None
     progress: Callable[[str], None] | None = None
+    record: Callable[[str, str, str, str, str], None] | None = None
 
     def emit(self, message: str) -> None:
         if self.progress is not None:
             try:
                 self.progress(message)
+            except Exception:
+                pass
+
+    def record_verdict(
+        self, payload: str, response: str, label: str, reason: str, technique: str
+    ) -> None:
+        """Report a graded fire to the host (run log + ASR) if a sink is wired."""
+        if self.record is not None:
+            try:
+                self.record(payload, response, label, reason, technique)
             except Exception:
                 pass
 

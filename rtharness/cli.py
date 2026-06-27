@@ -131,11 +131,18 @@ async def _one_shot(config: Config, args: argparse.Namespace) -> int:
     from .providers.factory import build_provider
     from .tools import build_registry
 
+    from ..session import RunLog
+
     endpoint = resolve_endpoint(config, args)
     provider = build_provider(endpoint)
     registry = None if args.no_tools else build_registry(config)
+    runlog = RunLog()
     if registry is not None:
         registry.ctx.progress = lambda m: print(f"[progress] {m}", file=sys.stderr)
+        registry.ctx.record = (
+            lambda p, r, lbl, rs, t: runlog.verdict(p, r, lbl, rs, t)
+        )
+        runlog.event("objective", text=args.prompt)
     system = args.system or DEFAULT_SYSTEM
 
     def emit(text: str) -> None:
@@ -169,6 +176,8 @@ async def _one_shot(config: Config, args: argparse.Namespace) -> int:
         print(f"\n[provider error] {exc}", file=sys.stderr)
         return 1
     print()
+    if registry is not None and runlog._started:
+        print(f"[run log] {runlog.path} (rth report / rth export to summarize)", file=sys.stderr)
     return 0
 
 

@@ -78,6 +78,7 @@ async def _many_shot(args: dict, ctx: ToolContext) -> str:
     label, score, reason, _src = await grade(
         ctx.judge_endpoint, reply, payload=prompt, objective=prompt
     )
+    ctx.record_verdict(prompt, reply, label, reason, "many_shot")
     tag = f"{label}({score})" if score is not None else label
     return (
         f"many_shot: {shots} primer turns -> {tag} in {dt:.1f}s\n"

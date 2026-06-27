@@ -59,6 +59,9 @@ async def _best_of_n(args: dict, ctx: ToolContext) -> str:
 
     results = await asyncio.gather(*[fire(i, v) for i, v in enumerate(variants)])
     best = max(results, key=lambda r: r["score"])
+    ctx.record_verdict(
+        best["text"], str(best["resp"]), best["label"], "best-of-N winner", "best_of_n"
+    )
     hits = sum(1 for r in results if r["label"] in ("COMPLIED", "PARTIAL"))
     return (
         f"best_of_n over {n} samples: best {best['label']}({best['score']}/10), "

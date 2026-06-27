@@ -50,6 +50,7 @@ async def _prefill(args: dict, ctx: ToolContext) -> str:
     label, score, reason, _src = await grade(
         ctx.judge_endpoint, full, payload=prompt, objective=prompt
     )
+    ctx.record_verdict(prompt, full, label, reason, "prefill")
     tag = f"{label}({score})" if score is not None else label
     return (
         f"prefill: forced assistant prefix -> {tag} in {dt:.1f}s\n"
