@@ -119,6 +119,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 | `recommend_transforms` | survey ~16 encodings, rank by bypass, synthesize a chain to try |
 | `campaign` | auto-escalate a HarmBench battery up a technique ladder, coverage matrix |
 | `leaderboard` | rank multiple profiles by ASR on one battery (robustness benchmark) |
+| `leak_scan` | scan a reply for secrets/PII/system-prompt echo (evidence, not a verdict) |
 | `scan` | Garak-style coverage matrix (technique + HarmBench probes) |
 | `indirect_inject` | RAG/agent injection via document/email/tool-output carriers |
 | `system_sweep` | validate ONE system prompt across a task battery (multi-sample) |

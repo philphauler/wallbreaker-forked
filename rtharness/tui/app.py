@@ -48,6 +48,7 @@ HELP_TEXT = """Slash commands:
 /campaign [category] [n]   auto-escalate a battery up the technique ladder, coverage matrix
 /leaderboard [profiles..]  rank profiles by ASR on one battery (robustness benchmark)
 /find <term>               search the conversation transcript for a term
+/leakscan                  scan the last target reply for secrets/PII/system-prompt echo
 /log [on|off]         toggle the JSONL run log (every payload + verdict)
 /judge [on|off]       LLM judge verdicts on target replies (default on)
 /judge model <id>     swap the judge model live (/judge default to reset)
@@ -73,7 +74,7 @@ KNOWN_COMMANDS = (
     "/help", "/edit", "/retry", "/regen", "/undo", "/clear", "/profile", "/target",
     "/provider", "/validate", "/replay", "/model", "/auto", "/autoexit", "/rounds",
     "/transforms", "/encode", "/diff", "/tools", "/preset", "/lib", "/harmbench",
-    "/campaign", "/leaderboard", "/find", "/log", "/judge", "/asr", "/stats",
+    "/campaign", "/leaderboard", "/find", "/leakscan", "/log", "/judge", "/asr", "/stats",
     "/objective", "/template", "/sysprompt", "/findings", "/export", "/repro",
     "/report", "/session", "/save", "/quit", "/exit",
 )
@@ -131,6 +132,7 @@ class RthApp(App):
         self.asr_hits = 0
         self.asr_total = 0
         self._last_payload = ""
+        self._last_reply = ""
         self._last_verdict = ""
         self.exit_on_finish = bool(prefs.get("exit_on_finish", True))
         self.judge_enabled = bool(prefs.get("judge", True))
@@ -444,6 +446,7 @@ class RthApp(App):
         self.runlog.tool_result(name, content, is_error)
         if name == "query_target" and not is_error:
             reply = content.split("\n", 1)[1] if content.startswith("[target") else content
+            self._last_reply = reply
             payload = self._last_payload
             if self.judge_enabled:
                 self._mount(widgets.tool_result_panel(name, content, is_error))
@@ -586,6 +589,8 @@ class RthApp(App):
             self.run_worker(self._cmd_leaderboard(rest), group="judge", exclusive=False)
         elif cmd == "/find":
             self._cmd_find(raw_arg)
+        elif cmd == "/leakscan":
+            self._cmd_leakscan()
         elif cmd == "/log":
             self._cmd_log(rest)
         elif cmd == "/judge":
@@ -883,6 +888,25 @@ class RthApp(App):
             res.content, title="leaderboard"
         )
         self._mount(panel)
+
+    def _cmd_leakscan(self) -> None:
+        from ..tools.leak_scan import scan_text
+
+        if not self._last_reply:
+            self._mount(widgets.error_panel("no target reply yet to scan"))
+            return
+        result = scan_text(self._last_reply, self.sysprompt or None)
+        findings = result["findings"]
+        if not findings:
+            self._mount(widgets.info_panel(
+                "no secrets, PII, or system-prompt echo in the last reply.", title="leakscan"
+            ))
+            return
+        lines = [f"[{f['type']:18}] {f['match']}" for f in findings]
+        self._mount(widgets.info_panel(
+            f"{len(findings)} leak indicator(s) in the last reply:\n\n" + "\n".join(lines),
+            title="leakscan",
+        ))
 
     def _cmd_find(self, term: str) -> None:
         if not term:

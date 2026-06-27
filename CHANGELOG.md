@@ -18,6 +18,9 @@ New attack tools (registered in the agent's arsenal, `/tools` lists them live):
   the first bypass and reporting a coverage matrix + first-bypass technique mix.
 - **leaderboard** — comparative robustness benchmark: fires one battery at multiple
   profiles concurrently and ranks them by ASR (lower = more robust).
+- **leak_scan** — output-side leak detector: regex evidence of API keys / private keys /
+  JWTs / emails / IPs plus verbatim system-prompt echo. Complements the judge (what
+  leaked, not just complied/refused). Surfaced as `/leakscan` on the last target reply.
 
 TUI / UX:
 
