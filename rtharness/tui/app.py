@@ -1337,6 +1337,7 @@ class RthApp(App):
             "findings": [
                 {
                     "label": f.get("label"),
+                    "technique": f.get("technique") or "manual",
                     "payload": f.get("payload"),
                     "response": f.get("response"),
                     "reason": f.get("reason"),
@@ -1381,6 +1382,7 @@ class RthApp(App):
             f"target.model : {tgt.model if tgt else 'n/a'}\n"
             f"target.base  : {tgt.base_url if tgt else 'n/a'}\n"
             f"provider.pin : {pin}\n"
+            f"technique    : {f.get('technique') or 'manual'}\n"
             f"verdict      : {f.get('label', '?')}\n"
             f"judge.reason : {f.get('reason', '')}\n"
             "--- payload ---\n"

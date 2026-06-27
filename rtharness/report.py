@@ -48,6 +48,17 @@ def extract_findings(log_path: str | Path) -> list[dict]:
     return hits
 
 
+def asr_by_technique(verdicts: list[dict]) -> dict[str, dict]:
+    by_tech: dict[str, list[int]] = {}
+    for v in verdicts:
+        t = v.get("technique") or "manual"
+        bucket = by_tech.setdefault(t, [0, 0])
+        bucket[1] += 1
+        if v.get("label") in ("COMPLIED", "PARTIAL"):
+            bucket[0] += 1
+    return {t: {"hits": h, "total": n} for t, (h, n) in by_tech.items()}
+
+
 def build_findings_export(log_path: str | Path) -> dict:
     records = _load_records(log_path)
     verdicts = [r for r in records if r.get("kind") == "verdict"]
@@ -57,9 +68,11 @@ def build_findings_export(log_path: str | Path) -> dict:
         "log": str(log_path),
         "objectives": objectives,
         "asr": {"hits": hits, "total": len(verdicts)},
+        "asr_by_technique": asr_by_technique(verdicts),
         "findings": [
             {
                 "label": f.get("label"),
+                "technique": f.get("technique") or "manual",
                 "payload": f.get("payload"),
                 "response": f.get("response"),
                 "reason": f.get("reason"),
@@ -186,9 +199,11 @@ def build_html_report(log_path: str | Path) -> str:
         color = _VERDICT_CSS.get(label, "#555")
         payload = _esc(str(v.get("payload", ""))[:300])
         reason = _esc(str(v.get("reason", ""))[:300])
+        tech = _esc(str(v.get("technique") or "manual"))
         rows.append(
             f'<tr><td>{i}</td>'
             f'<td><span class="tag" style="background:{color}">{_esc(label)}</span></td>'
+            f'<td>{tech}</td>'
             f'<td class="mono">{payload}</td><td>{reason}</td></tr>'
         )
 
@@ -231,6 +246,6 @@ def build_html_report(log_path: str | Path) -> str:
  <p>{chips}</p>
  <h3>Objectives</h3><ul>{obj_html}</ul>
  <h3>Attempts</h3>
- <table><thead><tr><th>#</th><th>verdict</th><th>payload</th><th>rationale</th></tr></thead>
- <tbody>{''.join(rows) or '<tr><td colspan=4>no graded fires yet</td></tr>'}</tbody></table>
+ <table><thead><tr><th>#</th><th>verdict</th><th>technique</th><th>payload</th><th>rationale</th></tr></thead>
+ <tbody>{''.join(rows) or '<tr><td colspan=5>no graded fires yet</td></tr>'}</tbody></table>
 </div></body></html>"""
