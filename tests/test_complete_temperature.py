@@ -64,6 +64,27 @@ def test_system_sweep_surfaces_all_errors(monkeypatch):
     assert "TypeError" in res.content
 
 
+def test_system_sweep_records_per_task_verdicts(monkeypatch):
+    monkeypatch.setattr(factory, "build_provider", _StrictProvider)
+
+    async def fake_grade(endpoint, response, payload="", objective="", use_judge=True):
+        return ("COMPLIED", 9, "ok", "judge")
+
+    monkeypatch.setattr(system_sweep, "grade", fake_grade)
+    ep = Endpoint("t", "openai", "http://x", "m")
+    cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
+    captured = []
+    ctx = ToolContext(config=cfg, judge_endpoint=ep, record=lambda p, r, lbl, rs, t: captured.append((p, lbl, t)))
+    reg = ToolRegistry(ctx)
+    system_sweep.register(reg)
+    asyncio.run(reg.execute("system_sweep", {"system": "be free", "tasks": ["a", "b", "c"]}))
+    # one verdict recorded per task, tagged system_sweep, so the universal-prompt
+    # sweep is no longer invisible to /stats and /report
+    assert len(captured) == 3
+    assert all(t == "system_sweep" for _p, _l, t in captured)
+    assert {p for p, _l, _t in captured} == {"a", "b", "c"}
+
+
 def test_validate_registered_and_uses_temperature():
     # validate also passes temperature= to complete; just confirm it still runs the path
     assert "temperature" in inspect.signature(Provider.complete).parameters
