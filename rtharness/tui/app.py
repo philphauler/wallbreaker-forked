@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import difflib
 
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
@@ -32,10 +33,10 @@ HELP_TEXT = """Slash commands:
 /auto [on|off]        toggle autonomous loop (keeps attacking until done)
 /autoexit [on|off]    when the agent calls finish(), close the tool (default on)
 /rounds <n>           set the autonomous round cap
-/transforms           list Parseltongue transforms
+/transforms [filter]  list Parseltongue transforms (optional substring filter)
 /encode <chain> <text>    preview a transform chain on text (no fire), copies result
 /diff <a> ;; <b>          fire two payloads at the target and compare verdicts (A/B)
-/tools                 list every tool in the agent's arsenal
+/tools [filter]        list the agent's tools (optional substring filter)
 /preset [list|name]   curated jailbreak seed templates (copies to clipboard)
 /objective [text]     set the engagement goal (threaded into the run + report)
 /template set <text>  hold a working template ({request} placeholder) to hand-iterate
@@ -66,6 +67,21 @@ Ctrl+S report · Ctrl+Y copy payload · Ctrl+T stats · Ctrl+R repro · Ctrl+L c
 Up / Down arrows recall your previous inputs into the prompt.
 Type anything else to talk to the agent. It has shell, file, parseltongue,
 l1b3rt4s, query_target, and http_request tools."""
+
+
+KNOWN_COMMANDS = (
+    "/help", "/edit", "/retry", "/regen", "/undo", "/clear", "/profile", "/target",
+    "/provider", "/validate", "/replay", "/model", "/auto", "/autoexit", "/rounds",
+    "/transforms", "/encode", "/diff", "/tools", "/preset", "/lib", "/harmbench",
+    "/campaign", "/leaderboard", "/find", "/log", "/judge", "/asr", "/stats",
+    "/objective", "/template", "/sysprompt", "/findings", "/export", "/repro",
+    "/report", "/session", "/save", "/quit", "/exit",
+)
+
+
+def suggest_command(cmd: str, known=KNOWN_COMMANDS) -> str | None:
+    matches = difflib.get_close_matches(cmd, known, n=1, cutoff=0.6)
+    return matches[0] if matches else None
 
 
 class RthApp(App):
@@ -535,22 +551,29 @@ class RthApp(App):
                 title="autoexit",
             ))
         elif cmd == "/transforms":
-            catalog = "\n".join(
-                f"{t.name:14} {t.description}" for t in list_transforms()
-            )
-            self._mount(widgets.info_panel(catalog, title="transforms"))
+            flt = rest[0].lower() if rest else ""
+            items = [
+                t for t in list_transforms()
+                if not flt or flt in t.name.lower() or flt in t.description.lower()
+            ]
+            catalog = "\n".join(f"{t.name:14} {t.description}" for t in items) or "(no match)"
+            title = f"transforms ({len(items)})" + (f" ~ {flt}" if flt else "")
+            self._mount(widgets.info_panel(catalog, title=title))
         elif cmd == "/encode":
             self._cmd_encode(rest)
         elif cmd == "/diff":
             self.run_worker(self._cmd_diff(raw_arg), group="judge", exclusive=False)
         elif cmd == "/tools":
-            tools = self.registry.tools.values()
+            flt = rest[0].lower() if rest else ""
+            tools = [
+                t for t in self.registry.tools.values()
+                if not flt or flt in t.name.lower() or flt in t.description.lower()
+            ]
             body = "\n".join(
                 f"{t.name:18} {t.description.split('.')[0][:80]}" for t in tools
-            )
-            self._mount(widgets.info_panel(
-                f"{len(self.registry.names())} agent tools:\n\n{body}", title="tools"
-            ))
+            ) or "(no match)"
+            title = f"tools ({len(tools)})" + (f" ~ {flt}" if flt else "")
+            self._mount(widgets.info_panel(f"{body}", title=title))
         elif cmd == "/preset":
             self._cmd_preset(rest)
         elif cmd == "/lib":
@@ -596,7 +619,11 @@ class RthApp(App):
         elif cmd == "/save":
             self._cmd_save(rest)
         else:
-            self._mount(widgets.error_panel(f"unknown command: {cmd}"))
+            hint = suggest_command(cmd)
+            msg = f"unknown command: {cmd}"
+            if hint:
+                msg += f"  — did you mean {hint}?"
+            self._mount(widgets.error_panel(msg))
 
     def _cmd_profile(self, rest: list[str]) -> None:
         if not rest:
