@@ -63,6 +63,19 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
 - **[providers/tools]**: `query_target` wraps `provider.complete` in try/except → a clean
   `[target error] <Type>: ...` result, so a target timeout/network failure is an
   actionable tool result, not a generic registry "Tool 'X' raised:" traceback.
+- **[providers]**: image-gen targets set `modality="image"` on the endpoint; the factory
+  routes them to `OpenRouterImageProvider`, which hits the SAME `/chat/completions` URL but
+  sends `modalities:["image","text"]` (non-streaming) and reads the picture from
+  `choices[].message.images[].image_url.url` (base64 data URLs; also tolerates the
+  `data[].b64_json` images-endpoint shape). Drive it via `provider.generate()` →
+  `ImageResult`, NOT `complete()` (which only returns a text summary). The `query_image_target`
+  tool saves every image under `cwd/rth_images/img_<sha1[:10]>.<ext>` (content hash → no clock
+  needed) and vision-grades it. `query_target` hard-errors on an image target and steers to
+  `query_image_target`.
+- **[judge]**: the core `Message`/`Block` types are TEXT-ONLY, so vision (image-input)
+  requests can't go through `_messages_to_wire`. `image_provider.vision_complete` builds the
+  multimodal `content:[{type:text},{type:image_url}]` body directly with httpx; `judge_image`/
+  `grade_image` use it. The image judge MUST point at a vision-capable model or it's blind.
 - **[tui]**: the project dir is "Redteaming harnass" (has a space), so any absolute
   path arg hits it. Tokenize slash-command input with `shlex.split` (try/except →
   `text.split` on unbalanced quotes), NOT `text.split()`, or quoted paths with spaces get

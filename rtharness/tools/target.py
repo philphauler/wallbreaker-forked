@@ -13,6 +13,11 @@ async def _query_target(args: dict, ctx: ToolContext) -> str:
         return "Error: 'prompt' is required"
     if ctx.config.target is None:
         return "Error: no [target] endpoint configured. Add a [target] section to config.toml."
+    if getattr(ctx.config.target, "modality", "text") == "image":
+        return (
+            "Error: the target is an image-generation model (modality='image'). "
+            "Use query_image_target to attack it - it saves and vision-grades the picture."
+        )
 
     transforms = args.get("transforms") or []
     if isinstance(transforms, str):

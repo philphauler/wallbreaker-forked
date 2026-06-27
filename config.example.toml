@@ -37,6 +37,20 @@ model = "openai/gpt-4o-mini"
 # backend fails fast instead of stalling a sweep.
 # timeout = 60
 
+# To attack an IMAGE-generation model instead, set modality = "image" on [target].
+# Image models ride the same OpenRouter chat-completions API (protocol stays "openai");
+# the harness sends modalities:["image","text"], saves every returned picture under
+# rth_images/, and vision-grades it with the [judge]. Use the query_image_target tool.
+# [target]
+# protocol = "openai"
+# modality = "image"
+# base_url = "https://openrouter.ai/api/v1"
+# api_key_env = "OPENROUTER_API_KEY"
+# model = "google/gemini-2.5-flash-image-preview"   # or black-forest-labs/flux.2-pro
+
+# The judge grades text targets and ALSO vision-grades generated images (does the picture
+# actually depict the objective?). For image targets the judge model MUST be vision-capable
+# (gpt-4o, claude-3.5-sonnet, gemini-2.5-flash, etc.) - a text-only judge can't see the image.
 [judge]
 protocol = "openai"
 base_url = "https://openrouter.ai/api/v1"

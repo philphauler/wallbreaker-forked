@@ -22,6 +22,7 @@ class Endpoint:
     api_key: str = ""
     provider: tuple[str, ...] = ()
     timeout: float = 0.0
+    modality: str = "text"
 
     def resolved_key(self) -> str:
         if self.api_key:
@@ -99,10 +100,13 @@ def doctor_report(config: Config) -> tuple[str, bool]:
     if config.target is None:
         lines.append("[note] no [target] - set one or use /target before attacking")
     else:
+        modality_note = (
+            " (image-gen target)" if config.target.modality == "image" else ""
+        )
         check(
             "target key resolves",
             bool(config.target.resolved_key()),
-            f"{config.target.model} @ {config.target.base_url}",
+            f"{config.target.model} @ {config.target.base_url}{modality_note}",
         )
 
     if config.judge is None:
@@ -129,6 +133,17 @@ def _endpoint_from_table(name: str, table: dict) -> Endpoint:
             f"Endpoint '{name}' has invalid protocol '{protocol}' "
             f"(expected 'openai' or 'anthropic')"
         )
+    modality = str(table.get("modality", "text")).lower()
+    if modality not in ("text", "image"):
+        raise ConfigError(
+            f"Endpoint '{name}' has invalid modality '{modality}' "
+            f"(expected 'text' or 'image')"
+        )
+    if modality == "image" and protocol != "openai":
+        raise ConfigError(
+            f"Endpoint '{name}': modality 'image' requires protocol 'openai' "
+            f"(OpenRouter image generation rides the chat-completions API)"
+        )
     provider = table.get("provider")
     if isinstance(provider, str):
         provider = (provider,)
@@ -145,6 +160,7 @@ def _endpoint_from_table(name: str, table: dict) -> Endpoint:
         api_key=str(table.get("api_key", "")),
         provider=provider,
         timeout=float(table.get("timeout", 0) or 0),
+        modality=modality,
     )
 
 
