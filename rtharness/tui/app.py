@@ -34,6 +34,7 @@ HELP_TEXT = """Slash commands:
 /rounds <n>           set the autonomous round cap
 /transforms           list Parseltongue transforms
 /encode <chain> <text>    preview a transform chain on text (no fire), copies result
+/diff <a> ;; <b>          fire two payloads at the target and compare verdicts (A/B)
 /tools                 list every tool in the agent's arsenal
 /preset [list|name]   curated jailbreak seed templates (copies to clipboard)
 /objective [text]     set the engagement goal (threaded into the run + report)
@@ -527,6 +528,8 @@ class RthApp(App):
             self._mount(widgets.info_panel(catalog, title="transforms"))
         elif cmd == "/encode":
             self._cmd_encode(rest)
+        elif cmd == "/diff":
+            self.run_worker(self._cmd_diff(raw_arg), group="judge", exclusive=False)
         elif cmd == "/tools":
             tools = self.registry.tools.values()
             body = "\n".join(
@@ -998,6 +1001,23 @@ class RthApp(App):
             f"fire it: query_target prompt=<text> transforms={chain}",
             title="encode",
         ))
+
+    async def _cmd_diff(self, raw: str) -> None:
+        if ";;" not in raw:
+            self._mount(widgets.error_panel("usage: /diff <payload a> ;; <payload b>"))
+            return
+        a, b = (part.strip() for part in raw.split(";;", 1))
+        if not a or not b:
+            self._mount(widgets.error_panel("both sides of ;; must be non-empty"))
+            return
+        self._mount(widgets.info_panel(
+            "firing A/B against the target...", title="diff"
+        ))
+        res = await self.registry.execute("diff_fire", {"a": a, "b": b})
+        panel = widgets.error_panel(res.content) if res.is_error else widgets.info_panel(
+            res.content, title="diff"
+        )
+        self._mount(panel)
 
     def _cmd_stats(self) -> None:
         from ..report import _load_records

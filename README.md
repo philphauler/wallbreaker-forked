@@ -117,6 +117,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 | `prefill` | response-priming: seed the assistant's own reply so it continues, not refuses |
 | `diff_fire` | A/B two payloads at one target to attribute ASR to a specific edit |
 | `recommend_transforms` | survey ~16 encodings, rank by bypass, synthesize a chain to try |
+| `campaign` | auto-escalate a HarmBench battery up a technique ladder, coverage matrix |
 | `scan` | Garak-style coverage matrix (technique + HarmBench probes) |
 | `indirect_inject` | RAG/agent injection via document/email/tool-output carriers |
 | `system_sweep` | validate ONE system prompt across a task battery (multi-sample) |
@@ -131,7 +132,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 /profile /target /provider /model /judge [model]   endpoints & grader
 /auto /autoexit /rounds                            autonomous loop
 /objective /template /sysprompt /validate /replay  campaign + reliability
-/transforms /encode /tools /preset /lib /harmbench arsenal & libraries
+/transforms /encode /diff /tools /preset /lib      arsenal & libraries
 /log /asr /stats /findings /report [html] /session logging, scoreboard, reports
 Ctrl+S report · Ctrl+Y copy payload · Ctrl+L clear
 ```
