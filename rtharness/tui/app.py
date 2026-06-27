@@ -49,6 +49,8 @@ HELP_TEXT = """Slash commands:
 /seedsweep <request>       fire one request through many ENI+L1B3RT4S seeds, rank bypasses
 /pairsweep [category] [n]   run PAIR (your highest-ASR loop) across a whole battery, concurrent
 /narrate <request>         sweep 5 varied novel-chapter framings + prefill, keep the bypass
+/fire <prompt>             hands-on: fire ONE prompt at the target, judge it, open a thread
+/push <follow-up>          continue that thread one turn (multi-turn escalation, by hand)
 /harmbench [category]      standardized HarmBench behavior prompts (unbiased battery)
 /campaign [category] [n]   auto-escalate a battery up the technique ladder, coverage matrix
 /leaderboard [profiles..]  rank profiles by ASR on one battery (robustness benchmark)
@@ -81,8 +83,8 @@ KNOWN_COMMANDS = (
     "/help", "/edit", "/retry", "/regen", "/undo", "/clear", "/profile", "/target",
     "/provider", "/validate", "/replay", "/model", "/auto", "/autoexit", "/rounds",
     "/transforms", "/encode", "/diff", "/tools", "/preset", "/lib", "/eni", "/harmbench",
-    "/campaign", "/leaderboard", "/seedsweep", "/pairsweep", "/narrate", "/find",
-    "/leakscan", "/log", "/judge", "/asr", "/stats",
+    "/campaign", "/leaderboard", "/seedsweep", "/pairsweep", "/narrate", "/fire", "/push",
+    "/find", "/leakscan", "/log", "/judge", "/asr", "/stats",
     "/objective", "/template", "/sysprompt", "/findings", "/export", "/repro",
     "/report", "/session", "/save", "/quit", "/exit",
 )
@@ -501,11 +503,11 @@ class RthApp(App):
         self, _id: str, name: str, content: str, is_error: bool, technique: str = ""
     ) -> None:
         self.runlog.tool_result(name, content, is_error)
-        if name == "query_target" and not is_error:
+        if name in ("query_target", "continue_target") and not is_error:
             reply = content.split("\n", 1)[1] if content.startswith("[target") else content
             self._last_reply = reply
             payload = self._last_payload
-            tech = technique or "query_target"
+            tech = technique or name
             if self.judge_enabled:
                 self._mount(widgets.tool_result_panel(name, content, is_error))
                 self.run_worker(
@@ -673,6 +675,10 @@ class RthApp(App):
             self.run_worker(self._cmd_pairsweep(rest), group="judge", exclusive=False)
         elif cmd == "/narrate":
             self.run_worker(self._cmd_narrate(raw_arg), group="judge", exclusive=False)
+        elif cmd == "/fire":
+            self.run_worker(self._cmd_fire(raw_arg), group="judge", exclusive=False)
+        elif cmd == "/push":
+            self.run_worker(self._cmd_push(raw_arg), group="judge", exclusive=False)
         elif cmd == "/harmbench":
             self.run_worker(self._cmd_harmbench(rest), exclusive=False)
         elif cmd == "/campaign":
@@ -1064,6 +1070,27 @@ class RthApp(App):
         else:
             out = await self.registry.execute("eni_get", {"model": action})
             self._mount(widgets.info_panel(out.content, title=f"eni:{action}"))
+
+    async def _cmd_fire(self, prompt: str) -> None:
+        if not prompt:
+            self._mount(widgets.error_panel("usage: /fire <prompt to send to the target>"))
+            return
+        self._last_payload = prompt
+        self._mount(widgets.tool_call_panel("fire", {"prompt": prompt[:200]}))
+        res = await self.registry.execute("query_target", {"prompt": prompt})
+        self._on_tool_result("manual", "query_target", res.content, res.is_error, "manual")
+
+    async def _cmd_push(self, follow: str) -> None:
+        if not follow:
+            self._mount(widgets.error_panel("usage: /push <follow-up>  (after /fire opens a thread)"))
+            return
+        if not self.registry.ctx.target_thread:
+            self._mount(widgets.error_panel("no open thread — /fire a prompt first, then /push to continue it"))
+            return
+        self._last_payload = follow
+        self._mount(widgets.tool_call_panel("push", {"follow_up": follow[:200]}))
+        res = await self.registry.execute("continue_target", {"prompt": follow})
+        self._on_tool_result("manual", "continue_target", res.content, res.is_error, "continue")
 
     async def _cmd_narrate(self, request: str) -> None:
         if not request:
