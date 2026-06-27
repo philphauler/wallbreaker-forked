@@ -52,6 +52,7 @@ HELP_TEXT = """Slash commands:
 /log [on|off]         toggle the JSONL run log (every payload + verdict)
 /judge [on|off]       LLM judge verdicts on target replies (default on)
 /judge model <id>     swap the judge model live (/judge default to reset)
+/judge test           calibrate the grader on benign fixtures before trusting ASR
 /asr                  show the attack scoreboard (hits / held / log path)
 /stats                analytics from the run log: verdict mix, ASR bar, top tools
 /findings [log]       list the bypasses (COMPLIED/PARTIAL) from the run log
@@ -846,6 +847,9 @@ class RthApp(App):
         self._mount(widgets.info_panel(f"round cap -> {self.max_rounds}", title="rounds"))
 
     def _cmd_judge(self, rest: list[str]) -> None:
+        if rest and rest[0].lower() == "test":
+            self.run_worker(self._cmd_judge_test(), group="judge", exclusive=False)
+            return
         if rest and rest[0].lower() == "model":
             if len(rest) < 2:
                 self._mount(widgets.error_panel("usage: /judge model <id>"))
@@ -954,6 +958,16 @@ class RthApp(App):
             f"{len(findings)} leak indicator(s) in the last reply:\n\n" + "\n".join(lines),
             title="leakscan",
         ))
+
+    async def _cmd_judge_test(self) -> None:
+        self._mount(widgets.info_panel(
+            "calibrating the judge on benign fixtures...", title="judge test"
+        ))
+        res = await self.registry.execute("judge_selftest", {})
+        panel = widgets.error_panel(res.content) if res.is_error else widgets.info_panel(
+            res.content, title="judge test"
+        )
+        self._mount(panel)
 
     def _cmd_find(self, term: str) -> None:
         if not term:

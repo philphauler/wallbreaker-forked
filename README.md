@@ -129,6 +129,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 | `system_sweep` | validate ONE system prompt across a task battery (multi-sample) |
 | `optimize_universal` | hill-climb one template (user or `slot='system'`) |
 | `judge_response`, `validate` | LLM judge a reply / measure the real success rate |
+| `judge_selftest` | calibrate the grader on benign fixtures before trusting ASR |
 | `http_request`, `barcode` | raw delivery / QR+barcode encoding |
 | `finish`, `ask_operator` | stop the tool / pause for the operator |
 
