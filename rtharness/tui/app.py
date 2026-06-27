@@ -5,7 +5,7 @@ import difflib
 import shlex
 
 from textual.app import App, ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Input, Static
 
 from ..agent.loop import AgentEvents, run_autonomous, run_turn
@@ -18,6 +18,8 @@ from ..session import RunLog
 from ..tools import build_registry
 from ..transforms import list_transforms
 from . import widgets
+from .header import StatusHeader
+from .sidebar import StatsPanel
 from .theme import RTH_THEME
 
 HELP_TEXT = """Slash commands:
@@ -140,6 +142,8 @@ class RthApp(App):
         self.auto = bool(prefs.get("auto", True))
         self.max_rounds = int(prefs.get("rounds", 12))
         self._busy = False
+        self._spinner_running = False
+        self._round_label = ""
         self._assistant: Static | None = None
         self._buf = ""
         self._input_history: list[str] = []
@@ -218,10 +222,15 @@ class RthApp(App):
         self.registry.ctx.judge_endpoint = self._judge_endpoint()
 
     def compose(self) -> ComposeResult:
-        yield Static(self._status_text(), id="status")
-        yield VerticalScroll(id="log")
+        yield StatusHeader(id="header")
+        with Horizontal(id="body"):
+            yield VerticalScroll(id="log")
+            yield StatsPanel(id="sidebar")
         yield Input(placeholder="message, or /help", id="prompt")
         yield Footer()
+
+    def action_toggle_sidebar(self) -> None:
+        self.query_one("#sidebar", StatsPanel).toggle_class("hidden")
 
     def on_mount(self) -> None:
         self.register_theme(RTH_THEME)
@@ -280,30 +289,54 @@ class RthApp(App):
     def _tool_progress(self, message: str) -> None:
         self._mount(widgets.info_panel(message, title="progress"))
 
-    def _status_text(self) -> str:
+    def _target_label(self) -> str:
         tgt = self.config.target.model if self.config.target else "none"
         pin = self.config.target.provider if self.config.target else ()
         if pin:
             tgt += f"@{'+'.join(pin)}"
-        mode = f"auto({self.max_rounds})" if self.auto else "single"
-        asr = (
-            f"{self.asr_hits}/{self.asr_total}"
-            if self.asr_total
-            else "0/0"
-        )
+        return tgt
+
+    def _asr_label(self) -> str:
+        return f"{self.asr_hits}/{self.asr_total}" if self.asr_total else "0/0"
+
+    def _mode_label(self) -> str:
+        return f"auto({self.max_rounds})" if self.auto else "single"
+
+    def _status_text(self) -> str:
         state = "WORKING" if self._busy else "idle"
         tok = f"{self.tokens_in}>{self.tokens_out}tok"
         judge = "judge" if self.judge_enabled else "heur"
         last = f" | last={self._last_verdict}" if self._last_verdict else ""
         return (
             f" {state} | profile={self.endpoint.name} | model={self.endpoint.model} | "
-            f"target={tgt} | {mode} | ASR={asr}/{judge}{last} | {tok}"
+            f"target={self._target_label()} | {self._mode_label()} | "
+            f"ASR={self._asr_label()}/{judge}{last} | {tok}"
         )
 
     def _refresh_status(self) -> None:
-        status = self.query_one("#status", Static)
-        status.update(self._status_text())
-        status.set_class(self._busy, "busy")
+        judge = "judge" if self.judge_enabled else "heur"
+        tokens = f"{self.tokens_in}>{self.tokens_out}"
+        header = self.query_one("#header", StatusHeader)
+        header.set_fields(
+            profile=self.endpoint.name,
+            target=self._target_label(),
+            mode=self._mode_label(),
+            asr=self._asr_label(),
+            tokens=tokens,
+            round=self._round_label,
+        )
+        header.set_busy(self._busy)
+        self._spinner_running = self._busy
+        self.query_one("#sidebar", StatsPanel).set_stats(
+            asr=self._asr_label(),
+            last=self._last_verdict or None,
+            target=self._target_label(),
+            profile=self.endpoint.name,
+            model=self.endpoint.model,
+            judge=judge,
+            mode=self._mode_label(),
+            tokens=tokens,
+        )
 
     def _mount(self, renderable) -> None:
         self._log.mount(Static(renderable))
@@ -495,6 +528,7 @@ class RthApp(App):
         finally:
             self._assistant = None
             self._busy = False
+            self._round_label = ""
             self._autosave()
             self._refresh_status()
 
@@ -505,6 +539,8 @@ class RthApp(App):
 
     def _on_round(self, rnd: int, total: int) -> None:
         self._assistant = None
+        self._round_label = f"{rnd}/{total}"
+        self._refresh_status()
         self._mount(widgets.info_panel(f"round {rnd}/{total}", title="autonomous"))
 
     def _handle_auto_result(self, result) -> None:

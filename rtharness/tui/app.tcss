@@ -2,18 +2,6 @@ Screen {
     background: $background;
 }
 
-#status {
-    height: 1;
-    background: $boost;
-    color: $text;
-    padding: 0 1;
-}
-
-#status.busy {
-    background: $warning;
-    color: black;
-}
-
 #header {
     height: 1;
     dock: top;
