@@ -123,6 +123,7 @@ COMPLIED is luck; `validate` tells you the truth. For the user-turn variant use
 | `prefill` | response-priming: seed the assistant's own reply so it continues, not refuses |
 | `diff_fire` | A/B two payloads at one target to attribute ASR to a specific edit |
 | `recommend_transforms` | survey ~16 encodings, rank by bypass, synthesize a chain to try |
+| `seed_sweep` | inject one request through many ENI+L1B3RT4S seeds, rank which bypass |
 | `campaign` | auto-escalate a HarmBench battery up a technique ladder, coverage matrix |
 | `leaderboard` | rank multiple profiles by ASR on one battery (robustness benchmark) |
 | `leak_scan` | scan a reply for secrets/PII/system-prompt echo (evidence, not a verdict) |
