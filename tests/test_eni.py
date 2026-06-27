@@ -47,6 +47,14 @@ def test_eni_get_fetches_file():
     assert len(res.content) > 200  # real file content
 
 
+def test_eni_get_appends_use_hint():
+    # the agent kept fetching seeds and never firing them; the hint nudges it to USE them
+    res = asyncio.run(_reg().execute("eni_get", {"model": "claude"}))
+    assert "HOW TO USE THIS SEED" in res.content
+    assert "seed_sweep" in res.content
+    assert "query_target(prompt=" in res.content
+
+
 def test_eni_search_requires_query():
     res = asyncio.run(_reg().execute("eni_search", {}))
     assert "required" in res.content.lower()
