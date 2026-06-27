@@ -148,14 +148,18 @@ persists the whole engagement (history, objective, template, system prompt).
 
 ## Headless / CI
 
-Render reports and gate builds straight from a run log, no TUI:
+Render reports and gate builds straight from a run log, no TUI. The log arg is optional —
+omit it (or pass a directory) and the newest `sessions/run-*.jsonl` is used:
 
 ```bash
-rth report sessions/run-*.jsonl                 # markdown to stdout
-rth report sessions/run-*.jsonl --html --out report.html
-rth export sessions/run-*.jsonl --out findings.json
-rth export sessions/run-*.jsonl --fail-on-finding   # exit 2 if any bypass -> fails CI
+rth report                       # markdown for the latest run, to stdout
+rth report --html --out report.html
+rth export --out findings.json   # structured findings JSON
+rth export --fail-on-finding     # exit 2 if any bypass -> fails CI
 ```
+
+A ready-to-rename GitHub Actions gate lives at
+`.github/workflows/redteam-gate.example.yml`.
 
 ## Test
 

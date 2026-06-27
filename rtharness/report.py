@@ -4,6 +4,23 @@ import json
 from pathlib import Path
 
 
+def latest_run_log(directory: str | Path = "sessions") -> Path | None:
+    d = Path(directory)
+    if not d.is_dir():
+        return None
+    logs = sorted(d.glob("run-*.jsonl"))
+    return logs[-1] if logs else None
+
+
+def resolve_log_path(arg: str | None, directory: str | Path = "sessions") -> Path | None:
+    if arg is None:
+        return latest_run_log(directory)
+    p = Path(arg)
+    if p.is_dir():
+        return latest_run_log(p)
+    return p if p.is_file() else None
+
+
 def _load_records(log_path: str | Path) -> list[dict]:
     path = Path(log_path)
     if not path.is_file():

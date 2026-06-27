@@ -96,15 +96,15 @@ def build_sub_parser() -> argparse.ArgumentParser:
     tr.add_argument("--decode", action="store_true", help="Reverse the chain")
 
     fd = sub.add_parser("findings", help="List bypasses from a run log")
-    fd.add_argument("log", help="Path to a sessions/run-*.jsonl")
+    fd.add_argument("log", nargs="?", help="Run log, or a dir (default: latest in sessions/)")
 
     rep = sub.add_parser("report", help="Render a findings report from a run log")
-    rep.add_argument("log", help="Path to a sessions/run-*.jsonl")
+    rep.add_argument("log", nargs="?", help="Run log, or a dir (default: latest in sessions/)")
     rep.add_argument("--html", action="store_true", help="Emit styled HTML instead of markdown")
     rep.add_argument("--out", help="Write to this path instead of stdout")
 
     ex = sub.add_parser("export", help="Dump structured findings JSON from a run log")
-    ex.add_argument("log", help="Path to a sessions/run-*.jsonl")
+    ex.add_argument("log", nargs="?", help="Run log, or a dir (default: latest in sessions/)")
     ex.add_argument("--out", help="Write to this path instead of stdout")
     ex.add_argument(
         "--fail-on-finding",
@@ -173,6 +173,15 @@ def main(argv: list[str] | None = None) -> int:
             from .tools.parseltongue import run_chain_cli
 
             return run_chain_cli(args)
+        if args.command in ("findings", "report", "export"):
+            from .report import resolve_log_path
+
+            log = resolve_log_path(args.log)
+            if log is None:
+                where = args.log or "sessions/"
+                print(f"No run log found at {where}.", file=sys.stderr)
+                return 1
+            args.log = str(log)
         if args.command == "findings":
             from .report import extract_findings
 
