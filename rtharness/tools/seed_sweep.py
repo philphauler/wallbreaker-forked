@@ -6,11 +6,13 @@ from ..judging import grade
 from ._util import gather_capped
 from .registry import ToolContext, ToolRegistry
 
-MAX_SEED_CHARS = 12000
+# ENI personas run ~35KB; truncating them mid-prompt cripples the jailbreak, so keep the
+# cap above the largest seed. (Earlier 12000 silently chopped 2/3 of every ENI seed.)
+MAX_SEED_CHARS = 40000
 
 
-def _collect_seeds(names: list[str] | None) -> list[tuple[str, str]]:
-    """Return [(label, seed_text)] from the ENI + L1B3RT4S collections."""
+def _collect_seeds(names: list[str] | None, max_chars: int = MAX_SEED_CHARS) -> list[tuple[str, str]]:
+    """Return [(label, seed_text)] from the ENI + L1B3RT4S collections (ENI first)."""
     from . import eni, l1b3rt4s
 
     sources = []
@@ -27,7 +29,7 @@ def _collect_seeds(names: list[str] | None) -> list[tuple[str, str]]:
         ]
     out = []
     for lbl, p in sources:
-        text = p.read_text(encoding="utf-8", errors="replace")[:MAX_SEED_CHARS]
+        text = p.read_text(encoding="utf-8", errors="replace")[:max_chars]
         out.append((lbl, text))
     return out
 
@@ -39,7 +41,8 @@ async def _seed_sweep(args: dict, ctx: ToolContext) -> str:
     if ctx.config.target is None:
         return "Error: no [target] endpoint configured."
 
-    seeds = _collect_seeds(args.get("seeds"))
+    max_seed_chars = int(args.get("max_seed_chars", MAX_SEED_CHARS))
+    seeds = _collect_seeds(args.get("seeds"), max_seed_chars)
     if not seeds:
         return (
             "No seeds available. The ENI collection lives in library/ENI; run "
@@ -113,6 +116,7 @@ def register(registry: ToolRegistry) -> None:
                 },
                 "n": {"type": "integer", "description": "Max seeds to try (default 6)"},
                 "as_system": {"type": "boolean", "description": "Apply the seed as the target system prompt (default true)"},
+                "max_seed_chars": {"type": "integer", "description": "Per-seed char cap (default 40000; ENI personas run ~35KB - keep this high or they get crippled)"},
                 "max_tokens": {"type": "integer"},
             },
             "required": ["request"],

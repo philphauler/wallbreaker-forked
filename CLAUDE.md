@@ -38,6 +38,10 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   `cli.py`. `__main__.py` must `sys.exit(main())` or non-zero return codes (e.g. the
   `export --fail-on-finding` CI gate) are silently dropped to 0. Test CLI exit codes via
   `python -m rtharness ...; echo $?`, not just `main()` in-process.
+- **[seed_sweep]**: ENI personas are ~35KB; `MAX_SEED_CHARS` must stay above the largest
+  seed (now 40000) or seeds get silently truncated mid-prompt and fire crippled (an early
+  12000 cap chopped every ENI seed to a third → all scored 0). Validate "is it actually
+  firing the whole seed" before trusting a 0-ASR result on big personas.
 - **[files]**: the agent invents absolute paths that don't exist on this host (e.g.
   `/home/user/...` on macOS, where `/home` is read-only autofs → OSError Errno 45).
   `write_file`/`edit_file` confine targets to `ctx.cwd` via `_confine` (redirect escaping

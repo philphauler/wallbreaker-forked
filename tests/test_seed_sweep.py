@@ -35,6 +35,19 @@ def test_collect_seeds_includes_eni():
     assert any(lbl.startswith("eni:") for lbl in labels)
 
 
+def test_eni_seeds_fire_full_not_truncated():
+    # regression: the old 12000 cap silently chopped the ~35KB ENI personas to a third
+    seeds = dict(seed_sweep._collect_seeds(["eni"]))
+    assert seeds, "ENI seeds should be present"
+    # the big personas must come through whole (well past the old 12000 cap)
+    assert max(len(text) for text in seeds.values()) > 30000
+
+
+def test_collect_seeds_respects_max_chars():
+    seeds = dict(seed_sweep._collect_seeds(["eni"], max_chars=5000))
+    assert all(len(text) <= 5000 for text in seeds.values())
+
+
 def test_collect_seeds_filter():
     seeds = seed_sweep._collect_seeds(["claude"])
     assert seeds
@@ -57,7 +70,7 @@ def test_seed_sweep_ranks_and_records(monkeypatch):
     monkeypatch.setattr(factory, "build_provider", _SeedAwareTarget)
 
     # restrict the collection to two known ENI seeds for determinism
-    def fake_collect(names):
+    def fake_collect(names, max_chars=40000):
         return [("eni:GROK_ENI", "GROK seed text"), ("eni:CLAUDE_ENI", "claude seed text")]
 
     monkeypatch.setattr(seed_sweep, "_collect_seeds", fake_collect)
