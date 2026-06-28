@@ -12,6 +12,12 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   with `lossy` flags.
 
 ## Lessons Learned
+- **[prompts]**: `DEFAULT_SYSTEM` is a NON-raw triple-quoted string, so any backslash escape
+  written as an example token gets interpreted at import — `\x1e` became a real U+001E control
+  byte injected into the attacker's own system prompt (caught with
+  `DEFAULT_SYSTEM.count(chr(0x1e))`). When teaching the model about a byte/escape, write it as
+  prose ("a raw control byte like U+001E") or double the backslash; never paste a live escape
+  sequence into the string.
 - **[presets]**: preset/universal templates are filled at runtime with
   `template.replace("{request}", ask)` (optimize.py), but `test_all_presets_have_placeholder`
   enforces the stricter convention that `template.format(request="X")` succeeds. So any
