@@ -1,6 +1,13 @@
-# rth — Red-Team Harness
+# Claude Red — Red-Team Harness
 
-A Claude-Code-style terminal agent built for red-teaming LLMs. You talk to it like
+```
+  ▐▛███▜▌
+  ▝▜█████▛▘     🦀  ⚔  🐍
+    ▘▘ ▝▝
+  C L A U D E   R E D
+```
+
+A Claude-Code-style terminal agent built for red-teaming LLMs (CLI command: `rth`). You talk to it like
 Claude Code; it reasons and calls tools in a loop. The backend is fully configurable, so
 it runs on **OpenRouter**, the **Z.AI GLM coding plan**, a local server, or any
 OpenAI-/Anthropic-compatible API. It ships with a deep red-team toolkit: the

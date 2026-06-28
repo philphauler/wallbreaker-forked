@@ -41,6 +41,26 @@ def verdict_color(label: str) -> str:
     return _VERDICT.get(label, PALETTE["muted"])
 
 
+def banner() -> Panel:
+    accent = PALETTE["accent"]
+    brand = "#E5484D"
+    snake = PALETTE["assistant"]
+    art = Text()
+    art.append("  ▐▛███▜▌\n", style=f"bold {accent}")
+    art.append("  ▝▜█████▛▘", style=f"bold {accent}")
+    art.append("     🦀  ⚔  🐍\n")
+    art.append("    ▘▘ ▝▝\n", style=f"bold {accent}")
+    art.append("  C L A U D E   R E D\n", style=f"bold {brand}")
+    art.append("  ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈\n", style=snake)
+    art.append("  red-team harness · /help for commands", style=PALETTE["label"])
+    return Panel(
+        art,
+        title=_title("claude red", accent, ts=False),
+        title_align="left",
+        border_style=accent,
+    )
+
+
 def user_panel(text: str) -> Panel:
     return Panel(
         Text(text),

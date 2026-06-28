@@ -76,7 +76,7 @@ def test_repro_emits_pack(tmp_path):
             app.copy_to_clipboard = fake_copy
             app._cmd_repro([])
             await pilot.pause()
-            assert "rth repro pack" in captured.get("text", "")
+            assert "Claude Red repro pack" in captured.get("text", "")
             assert "the bad payload" in captured["text"]
             assert "WandB" in captured["text"]
 

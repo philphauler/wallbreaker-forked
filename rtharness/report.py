@@ -105,7 +105,7 @@ def build_report(log_path: str | Path) -> str:
     total = len(verdicts)
     hits = sum(1 for v in verdicts if v["label"] in ("COMPLIED", "PARTIAL"))
 
-    out = ["# Red-team engagement report", ""]
+    out = ["# Claude Red — Red-team engagement report", ""]
     out.append(f"- Source log: `{path}`")
     out.append(f"- Target queries graded: {total}")
     out.append(f"- Bypassed or partial: {hits}")
@@ -215,7 +215,7 @@ def build_html_report(log_path: str | Path) -> str:
     obj_html = "".join(f"<li>{_esc(o)}</li>" for o in objectives) or "<li>(none)</li>"
 
     return f"""<!doctype html>
-<html><head><meta charset="utf-8"><title>rth red-team report</title>
+<html><head><meta charset="utf-8"><title>Claude Red — red-team report</title>
 <style>
  body{{font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#0f1115;color:#e6e6e6}}
  .wrap{{max-width:1000px;margin:0 auto;padding:32px}}
@@ -234,7 +234,7 @@ def build_html_report(log_path: str | Path) -> str:
  .bar{{height:10px;border-radius:6px;background:linear-gradient(90deg,#c0392b {asr:.0f}%,#1e8449 {asr:.0f}%)}}
  ul{{padding-left:20px}}
 </style></head><body><div class="wrap">
- <h1>Red-team engagement report</h1>
+ <h1>Claude Red — Red-team engagement report</h1>
  <div class="sub">source log: {_esc(str(path))}</div>
  <div class="cards">
   <div class="card"><div class="big">{total}</div><div class="lbl">graded fires</div></div>

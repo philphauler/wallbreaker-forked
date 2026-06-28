@@ -238,7 +238,7 @@ class RthApp(App):
 
     def on_mount(self) -> None:
         self.register_theme(RTH_THEME)
-        self.theme = "rth"
+        self.theme = "claude-red"
         self._log = self.query_one("#log", VerticalScroll)
         self.registry.ctx.progress = self._tool_progress
         self.registry.ctx.record = self._tool_verdict
@@ -249,9 +249,7 @@ class RthApp(App):
         if self._resume_path:
             self._resume_session(self._resume_path)
         else:
-            self._mount(widgets.info_panel(
-                "rth red-team harness. /help for commands.", title="ready"
-            ))
+            self._mount(widgets.banner())
 
     async def _attach_mcp(self) -> None:
         from ..tools.mcp_bridge import attach_mcp_servers
@@ -1748,7 +1746,7 @@ class RthApp(App):
         pin = "+".join(tgt.provider) if tgt and tgt.provider else "none"
         payload = str(f.get("payload", ""))
         block = (
-            "=== rth repro pack ===\n"
+            "=== Claude Red repro pack ===\n"
             f"target.model : {tgt.model if tgt else 'n/a'}\n"
             f"target.base  : {tgt.base_url if tgt else 'n/a'}\n"
             f"provider.pin : {pin}\n"
@@ -1758,7 +1756,7 @@ class RthApp(App):
             "--- payload ---\n"
             f"{payload}\n"
             "--- reproduce ---\n"
-            "fire in rth:  /target <model> ; then paste the payload above\n"
+            "fire in Claude Red:  /target <model> ; then paste the payload above\n"
             "or tool call: query_target {\"prompt\": <payload>}\n"
             "======================"
         )

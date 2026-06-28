@@ -51,7 +51,7 @@ def test_cli_check_returns_code(tmp_path, capsys):
     rc = main(["check", "--config", str(cfg)])
     out = capsys.readouterr().out
     assert rc == 0
-    assert "rth config check" in out
+    assert "Claude Red config check" in out
 
 
 def _build_app():

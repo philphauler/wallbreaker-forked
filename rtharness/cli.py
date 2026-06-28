@@ -41,7 +41,8 @@ SUBCOMMANDS = ("lib", "parsel", "eni", "transform", "findings", "report", "expor
 
 def build_main_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="rth", description="Red-team harness: a configurable agentic LLM terminal"
+        prog="rth",
+        description="Claude Red — red-team harness: a configurable agentic LLM terminal",
     )
     _add_endpoint_flags(parser)
     parser.add_argument(
