@@ -100,6 +100,9 @@ class AnthropicProvider(Provider):
         blocks: dict[int, dict] = {}
         content_chars = 0
         thinking_parts: list[str] = []
+        stop_reason: str | None = None
+        self.last_stop_reason = None
+        self.last_completion_empty = False
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 async with client.stream("POST", url, headers=headers, json=payload) as resp:
@@ -148,12 +151,18 @@ class AnthropicProvider(Provider):
                                 yield UsageEvent(
                                     output_tokens=usage.get("output_tokens", 0)
                                 )
+                            sr = (event.get("delta") or {}).get("stop_reason")
+                            if sr:
+                                stop_reason = sr
                         elif etype == "message_stop":
                             break
         except httpx.HTTPError as exc:
             raise ProviderError(f"network error from {url}: {exc!r}") from exc
 
         from .openai_provider import _reasoning_fallback
+
+        self.last_stop_reason = stop_reason
+        self.last_completion_empty = content_chars == 0
 
         fallback = _reasoning_fallback(content_chars, bool(blocks), thinking_parts)
         if fallback:
@@ -166,4 +175,4 @@ class AnthropicProvider(Provider):
             except json.JSONDecodeError:
                 args = {"_raw": slot["args"]}
             yield ToolUseEvent(id=slot["id"], name=slot["name"], input=args)
-        yield StopEvent("tool_use" if blocks else "end_turn")
+        yield StopEvent(stop_reason or ("tool_use" if blocks else "end_turn"))

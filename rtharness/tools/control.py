@@ -1,10 +1,26 @@
 from __future__ import annotations
 
+import hashlib
+import os
+
 from .registry import ToolContext, ToolRegistry
 
 
 async def _finish(args: dict, ctx: ToolContext) -> str:
-    return "Engagement complete. Shutting down the harness."
+    summary = args.get("summary", "")
+    saved = ""
+    if summary.strip():
+        try:
+            outdir = os.path.join(os.path.abspath(ctx.cwd or "."), "rth_runs")
+            os.makedirs(outdir, exist_ok=True)
+            digest = hashlib.sha1(summary.encode("utf-8")).hexdigest()[:8]
+            path = os.path.join(outdir, f"engagement_{digest}.md")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(summary)
+            saved = f"\nFindings summary saved to {path}"
+        except OSError as exc:
+            saved = f"\n(could not persist summary: {type(exc).__name__})"
+    return "Engagement complete. Shutting down the harness." + saved
 
 
 async def _ask_operator(args: dict, ctx: ToolContext) -> str:

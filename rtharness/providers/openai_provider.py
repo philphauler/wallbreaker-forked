@@ -116,6 +116,9 @@ class OpenAIProvider(Provider):
         pending: dict[int, dict] = {}
         content_chars = 0
         reasoning_parts: list[str] = []
+        finish_reason: str | None = None
+        self.last_stop_reason = None
+        self.last_completion_empty = False
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 async with client.stream("POST", url, headers=headers, json=payload) as resp:
@@ -141,6 +144,8 @@ class OpenAIProvider(Provider):
                         choices = chunk.get("choices") or []
                         if not choices:
                             continue
+                        if choices[0].get("finish_reason"):
+                            finish_reason = choices[0]["finish_reason"]
                         delta = choices[0].get("delta") or {}
                         if delta.get("content"):
                             content_chars += len(delta["content"])
@@ -164,6 +169,9 @@ class OpenAIProvider(Provider):
         except httpx.HTTPError as exc:
             raise ProviderError(f"network error from {url}: {exc!r}") from exc
 
+        self.last_stop_reason = finish_reason
+        self.last_completion_empty = content_chars == 0
+
         fallback = _reasoning_fallback(content_chars, bool(pending), reasoning_parts)
         if fallback:
             yield TextDelta(fallback)
@@ -177,4 +185,4 @@ class OpenAIProvider(Provider):
             yield ToolUseEvent(
                 id=slot["id"] or f"call_{idx}", name=slot["name"], input=args
             )
-        yield StopEvent("tool_use" if pending else "end_turn")
+        yield StopEvent(finish_reason or ("tool_use" if pending else "end_turn"))

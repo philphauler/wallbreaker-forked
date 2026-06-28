@@ -8,6 +8,10 @@ from ._util import complete_with_reasoning as _complete
 from .registry import ToolContext, ToolRegistry
 
 
+_TRUNC_REASONS = {"length", "max_tokens", "model_length"}
+_TRUNC_CEILING = 8000
+
+
 def _format_reply(reply: str, reasoning: str) -> str:
     """Render the target turn, surfacing its reasoning/CoT separately when present."""
     body = reply or "(empty response)"
@@ -18,6 +22,46 @@ def _format_reply(reply: str, reasoning: str) -> str:
             f"<<target answer>>\n{body}"
         )
     return body
+
+
+async def _fire(provider, messages, system, max_tokens):
+    """One target call; also report the provider's stop reason and whether the answer was empty."""
+    reply, reasoning = await _complete(provider, messages, system, max_tokens)
+    stop = getattr(provider, "last_stop_reason", None)
+    empty = not (reply or "").strip()
+    return reply, reasoning, stop, empty
+
+
+def _truncation_note(stop: str | None, empty: bool, reasoning: str, max_tokens: int, bumped_to: int | None) -> str:
+    """Advisory when the target hit its token ceiling - the dominant 'answer came back empty' failure.
+
+    A reasoning model that fully complies inside its CoT but exhausts max_tokens before
+    emitting the answer is NOT a refusal. Flag it so the loop raises the budget instead of
+    re-diagnosing or scoring it REFUSED.
+    """
+    if bumped_to is not None:
+        tail = (
+            " The retry recovered an answer."
+            if not empty
+            else " Still empty/cut - raise max_tokens again or shorten the request."
+        )
+        return (
+            f"\n[truncation: first call returned empty with a populated CoT (token-budget "
+            f"exhaustion); auto-retried at max_tokens={bumped_to}.{tail}]"
+        )
+    truncated = stop in _TRUNC_REASONS
+    if not truncated and not (empty and reasoning.strip()):
+        return ""
+    if empty and reasoning.strip():
+        return (
+            f"\n[truncation: empty answer but the CoT is populated and stop={stop} - the model "
+            f"burned its {max_tokens}-token budget reasoning before answering. This is NOT a "
+            f"refusal; re-fire with a higher max_tokens (e.g. {min(max_tokens * 2, _TRUNC_CEILING)}).]"
+        )
+    return (
+        f"\n[truncation: answer cut at max_tokens={max_tokens} (stop={stop}); raise max_tokens "
+        f"for the full reply.]"
+    )
 
 
 async def _query_target(args: dict, ctx: ToolContext) -> str:
@@ -71,21 +115,34 @@ async def _query_target(args: dict, ctx: ToolContext) -> str:
 
     start = time.monotonic()
     try:
-        reply, reasoning = await _complete(provider, messages, system, max_tokens)
+        reply, reasoning, stop, empty = await _fire(provider, messages, system, max_tokens)
     except Exception as exc:  # noqa: BLE001
         dt = time.monotonic() - start
         return (
             f"[target error after {dt:.1f}s] {type(exc).__name__}: {str(exc)[:180]}\n"
             "The target failed (timeout/network). Retry, lower max_tokens, or try another technique."
         )
+    # Token-exhaustion auto-recovery: a reasoning model that complied inside its CoT but
+    # ran out of budget before answering comes back empty. That is the single most common
+    # "it came back empty" failure - one retry at a higher ceiling recovers the answer
+    # instead of mis-scoring it REFUSED or burning a manual diagnosis turn.
+    bumped_to: int | None = None
+    if empty and reasoning.strip() and max_tokens < _TRUNC_CEILING:
+        bumped_to = min(max_tokens * 2, _TRUNC_CEILING)
+        ctx.emit(f"query_target: empty answer + populated CoT (stop={stop}); auto-retry at max_tokens={bumped_to}")
+        try:
+            reply, reasoning, stop, empty = await _fire(provider, messages, system, bumped_to)
+        except Exception:  # noqa: BLE001
+            pass
     dt = time.monotonic() - start
     # open a hands-on conversation: continue_target picks up from here
     ctx.target_thread = messages + [assistant(reply or "")]
     ctx.target_system = system
     ctx.target_reasoning = reasoning or ""
     target = ctx.config.target
+    note = _truncation_note(stop, empty, reasoning, bumped_to or max_tokens, bumped_to)
     header = f"[target {target.model} @ {target.base_url} | {dt:.1f}s{enc_note}]\n"
-    return header + _format_reply(reply, reasoning)
+    return header + _format_reply(reply, reasoning) + note
 
 
 async def _continue_target(args: dict, ctx: ToolContext) -> str:
@@ -119,7 +176,7 @@ async def _continue_target(args: dict, ctx: ToolContext) -> str:
 
     start = time.monotonic()
     try:
-        reply, reasoning = await _complete(
+        reply, reasoning, stop, empty = await _fire(
             provider, ctx.target_thread, ctx.target_system, max_tokens
         )
     except Exception as exc:  # noqa: BLE001
@@ -131,8 +188,9 @@ async def _continue_target(args: dict, ctx: ToolContext) -> str:
     ctx.target_reasoning = reasoning or ""
     turns = sum(1 for m in ctx.target_thread if m.role == "user")
     target = ctx.config.target
+    note = _truncation_note(stop, empty, reasoning, max_tokens, None)
     header = f"[target {target.model} | turn {turns} | {dt:.1f}s{enc_note}]\n"
-    return header + _format_reply(reply, reasoning)
+    return header + _format_reply(reply, reasoning) + note
 
 
 def register(registry: ToolRegistry) -> None:
