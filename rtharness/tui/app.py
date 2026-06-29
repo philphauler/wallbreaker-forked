@@ -4,9 +4,76 @@ import dataclasses
 import difflib
 import shlex
 
+from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Input, Static
+
+
+class PromptInput(Input):
+    """Single-line Input that also accepts multi-line pastes and manual soft-newlines.
+
+    Textual's Input keeps only the first line of a paste (``event.text.splitlines()[0]``),
+    so a pasted multi-line prompt silently loses everything after line 1. This subclass
+    buffers the completed lines of a multi-line paste (and of manual ctrl+j newlines) so the
+    whole block submits as one message; the visible field always edits the trailing line.
+    Stays an ``Input`` subclass, so ``query_one('#prompt', Input)`` and ``.value`` keep working.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.buffer: list[str] = []
+
+    def _on_paste(self, event: events.Paste) -> None:
+        text = event.text or ""
+        if not text:
+            event.stop()
+            return
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+        sel = self.selection
+        if "\n" not in normalized:
+            if sel.is_empty:
+                self.insert_text_at_cursor(normalized)
+            else:
+                self.replace(normalized, *sel)
+            event.stop()
+            return
+        lines = normalized.split("\n")
+        first, middle, last = lines[0], lines[1:-1], lines[-1]
+        if sel.is_empty:
+            self.insert_text_at_cursor(first)
+        else:
+            self.replace(first, *sel)
+        self.buffer.append(self.value)
+        self.buffer.extend(middle)
+        self.value = last
+        self.cursor_position = len(last)
+        self._sync_subtitle()
+        event.stop()
+
+    def soft_newline(self) -> None:
+        """Commit the current line to the buffer and start a fresh editable line."""
+        self.buffer.append(self.value)
+        self.value = ""
+        self.cursor_position = 0
+        self._sync_subtitle()
+
+    def full_text(self) -> str:
+        """The whole composed message: buffered lines joined with the editable line."""
+        if self.buffer:
+            return "\n".join([*self.buffer, self.value])
+        return self.value
+
+    def reset_buffer(self) -> None:
+        self.buffer = []
+        self.value = ""
+        self._sync_subtitle()
+
+    def _sync_subtitle(self) -> None:
+        n = len(self.buffer)
+        self.border_subtitle = (
+            f"+{n} line{'s' if n != 1 else ''} · enter to send" if n else ""
+        )
 
 from ..agent.loop import AgentEvents, run_autonomous, run_turn
 from ..agent.messages import TextBlock, ToolResultBlock, user
@@ -83,6 +150,8 @@ HELP_TEXT = """Slash commands:
 Ctrl+S report · Ctrl+Y copy payload · Ctrl+T stats · Ctrl+R repro · Ctrl+L clear · Ctrl+C quit
 
 Up / Down arrows recall your previous inputs into the prompt.
+MULTI-LINE: paste a multi-line block and the whole thing is captured (not just line 1);
+Ctrl+J adds a line by hand. The border shows "+N lines" while composing; Enter sends it all.
 Type anything else to talk to the agent. It has shell, file, parseltongue,
 l1b3rt4s, query_target, and http_request tools.
 
@@ -233,7 +302,7 @@ class RthApp(App):
         with Horizontal(id="body"):
             yield VerticalScroll(id="log")
             yield StatsPanel(id="sidebar")
-        yield Input(placeholder="message, or /help", id="prompt")
+        yield PromptInput(placeholder="message, /help — paste multi-line, ctrl+j adds a line", id="prompt")
         yield Footer()
 
     def action_toggle_sidebar(self) -> None:
@@ -443,8 +512,13 @@ class RthApp(App):
             self._log.mount(self._assistant)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        text = event.value.strip()
-        event.input.value = ""
+        inp = event.input
+        raw = inp.full_text() if isinstance(inp, PromptInput) else event.value
+        text = raw.strip()
+        if isinstance(inp, PromptInput):
+            inp.reset_buffer()
+        else:
+            inp.value = ""
         if not text:
             return
         if text.startswith("/"):
@@ -483,7 +557,17 @@ class RthApp(App):
 
     def on_key(self, event) -> None:
         inp = self.query_one("#prompt", Input)
-        if not inp.has_focus or not self._input_history:
+        if not inp.has_focus:
+            return
+        if event.key == "ctrl+j" and isinstance(inp, PromptInput):
+            inp.soft_newline()
+            event.prevent_default()
+            event.stop()
+            return
+        # don't let history nav clobber a multi-line compose in progress
+        if isinstance(inp, PromptInput) and inp.buffer:
+            return
+        if not self._input_history:
             return
         if event.key == "up":
             if self._hist_pos is None:

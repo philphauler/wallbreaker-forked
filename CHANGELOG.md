@@ -1,5 +1,15 @@
 # Changelog
 
+## TUI multi-line input + paste
+
+The prompt is now a `PromptInput` (an `Input` subclass, so `query_one('#prompt', Input)` and
+`.value` still work). Textual's stock `Input._on_paste` keeps only `splitlines()[0]`, so a
+pasted multi-line block silently lost every line after the first. `PromptInput` buffers the
+completed lines of a multi-line paste (CRLF normalized) and submits the whole block as one
+message; the trailing line stays editable. `Ctrl+J` commits a line by hand for manual
+multi-line composing, the border shows "+N lines · enter to send", and history Up/Down is
+suppressed mid-compose so it can't clobber a draft. Enter sends the full composed text.
+
 ## 2026 frontier-reasoning arsenal (GPT-5/5.5-class hardened targets)
 
 Adds the late-2025/2026 technique set for multi-layer targets that stack an input/jailbreak
