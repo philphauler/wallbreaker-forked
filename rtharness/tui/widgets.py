@@ -231,7 +231,7 @@ def feedback_panel(text: str, queued: bool = False) -> Panel:
     state = "queued" if queued else "live"
     body = Text()
     body.append(
-        "adapts next round\n" if queued else "injected, adapting now\n",
+        "applies on the next model turn\n" if queued else "injected, adapting now\n",
         style=f"bold {color}",
     )
     body.append(text)

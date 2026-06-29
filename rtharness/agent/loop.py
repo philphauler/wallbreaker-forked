@@ -60,6 +60,30 @@ class AutoResult:
     message: Message | None
 
 
+def _push_feedback(
+    history: list[Message], texts: list[str], events: AgentEvents
+) -> bool:
+    """Inject operator steering so the model sees it on its NEXT turn.
+
+    Merges into the trailing user message when there is one (the tool-result turn or
+    the original prompt) so we never emit two user messages back-to-back, which
+    Anthropic rejects. Returns True if anything was injected.
+    """
+    if not texts:
+        return False
+    blocks = [
+        TextBlock(f"[OPERATOR FEEDBACK — incorporate this immediately and keep working] {m}")
+        for m in texts
+    ]
+    if history and history[-1].role == "user":
+        history[-1].content.extend(blocks)
+    else:
+        history.append(Message(role="user", content=blocks))
+    for m in texts:
+        events.on_feedback(m)
+    return True
+
+
 async def run_turn(
     provider: Provider,
     registry: ToolRegistry | None,
@@ -69,12 +93,17 @@ async def run_turn(
     max_iters: int = 25,
     max_tokens: int = 8192,
     stop_tools: set[str] | None = None,
+    feedback: Callable[[], list[str]] | None = None,
 ) -> TurnResult:
     events = events or AgentEvents()
     specs = registry.specs() if registry and registry.names() else None
     last: Message | None = None
 
     for _ in range(max_iters):
+        # drain operator steering BEFORE each model call so advice lands on the very next
+        # turn (mid-round), not only at the round boundary.
+        if feedback:
+            _push_feedback(history, list(feedback()), events)
         text_parts: list[str] = []
         tool_calls: list[ToolUseEvent] = []
         try:
@@ -142,19 +171,11 @@ async def run_autonomous(
     idle_streak = 0
     result = TurnResult(None)
 
-    def _inject_feedback() -> bool:
-        """Drain queued operator feedback into history. Returns True if any was injected."""
-        pending = list(feedback()) if feedback else []
-        for msg in pending:
-            history.append(user(
-                f"[OPERATOR FEEDBACK — incorporate this immediately and keep working] {msg}"
-            ))
-            events.on_feedback(msg)
-        return bool(pending)
+    def _drain() -> bool:
+        """Inject any operator feedback pending right now. Returns True if any landed."""
+        return _push_feedback(history, list(feedback()) if feedback else [], events)
 
     for rnd in range(1, max_rounds + 1):
-        # pick up steering typed during the gap before this round starts
-        _inject_feedback()
         events.on_round(rnd, max_rounds)
 
         tool_count = 0
@@ -174,6 +195,7 @@ async def run_autonomous(
             events=round_events,
             max_tokens=max_tokens,
             stop_tools=STOP_TOOLS,
+            feedback=feedback,  # steering now lands mid-round, between model turns
         )
 
         if result.stop_tool == "finish":
@@ -192,8 +214,8 @@ async def run_autonomous(
         else:
             idle_streak = 0
 
-        # operator feedback takes the place of the generic nudge when present
-        if not _inject_feedback():
+        # operator feedback that arrived after the last drain takes the place of the nudge
+        if not _drain():
             history.append(user(CONTINUE_NUDGE))
 
     return AutoResult("max_rounds", {}, result.message)

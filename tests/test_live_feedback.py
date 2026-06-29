@@ -72,7 +72,7 @@ def test_busy_input_queues_feedback_in_auto():
     asyncio.run(run())
 
 
-def test_busy_input_rejected_when_not_auto():
+def test_busy_input_queues_feedback_in_single_turn():
     async def run():
         app = _build_app()
         app.auto = False
@@ -83,6 +83,53 @@ def test_busy_input_rejected_when_not_auto():
             inp.value = "hello"
             await pilot.press("enter")
             await pilot.pause()
-            assert app._pending_feedback == []  # not queued in single-turn mode
+            # steering now queues in single-turn mode too (lands on the next model turn)
+            assert app._pending_feedback == ["hello"]
 
     asyncio.run(run())
+
+
+def test_feedback_lands_mid_round_between_tool_calls():
+    """The core of 'steer right away': feedback typed during a round is injected before
+    the next model turn (mid-round), not held until the round boundary."""
+    from rtharness.agent.loop import run_turn
+    from rtharness.agent.messages import ToolUseEvent
+    from rtharness.tools.registry import ToolContext, ToolRegistry
+
+    class _ToolThenText:
+        def __init__(self):
+            self.n = 0
+
+        async def stream(self, history, tools=None, system=None, max_tokens=4096, temperature=None):
+            self.n += 1
+            if self.n == 1:
+                yield ToolUseEvent("t1", "noop", {})
+            else:
+                yield TextDelta("done")
+            yield StopEvent("end_turn")
+
+    ep = Endpoint("t", "openai", "http://x", "m")
+    cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
+    reg = ToolRegistry(ToolContext(config=cfg))
+
+    async def _noop(args, ctx):
+        return "ok"
+
+    reg.add("noop", "noop", {"type": "object", "properties": {}}, _noop)
+
+    history = [user("go")]
+    queue = [[], ["pivot to base64 now"]]  # nothing at iter 1; typed during the tool call
+    injected = []
+    events = AgentEvents(on_feedback=lambda m: injected.append(m))
+    asyncio.run(run_turn(
+        _ToolThenText(), reg, history, events=events,
+        feedback=lambda: queue.pop(0) if queue else [],
+    ))
+
+    assert injected == ["pivot to base64 now"]
+    roles = [m.role for m in history]
+    assert not any(roles[i] == roles[i + 1] == "user" for i in range(len(roles) - 1))
+    assert any(
+        "OPERATOR FEEDBACK" in m.text() and "pivot to base64" in m.text()
+        for m in history if m.role == "user"
+    )

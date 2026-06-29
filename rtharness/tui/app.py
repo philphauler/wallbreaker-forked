@@ -451,12 +451,11 @@ class RthApp(App):
             self._handle_command(text)
             return
         if self._busy:
-            if self.auto:
-                self._pending_feedback.append(text)
-                self._record_input(text)
-                self._mount(widgets.feedback_panel(text, queued=True))
-            else:
-                self._mount(widgets.error_panel("Agent is still working; wait for it."))
+            # steer mid-flight: queue it; the loop injects it before its next model turn
+            # (lands "right away" without waiting for the round to finish), in auto OR single.
+            self._pending_feedback.append(text)
+            self._record_input(text)
+            self._mount(widgets.feedback_panel(text, queued=True))
             return
         self._submit_user(text)
 
@@ -614,6 +613,7 @@ class RthApp(App):
                     system=self.system,
                     events=events,
                     max_tokens=self.max_tokens,
+                    feedback=self._drain_feedback,
                 )
         finally:
             self._assistant = None
