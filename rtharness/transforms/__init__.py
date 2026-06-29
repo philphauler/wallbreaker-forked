@@ -46,6 +46,7 @@ TRANSFORMS: dict[str, Transform] = dict(
         _t("nato", encodings.nato_encode, encodings.nato_decode, "NATO phonetic spelling (drops spacing/case)", lossy=True),
         _t("leet", encodings.leet_encode, encodings.leet_decode, "Leetspeak substitution (approximate decode)", lossy=True),
         _t("reverse", encodings.reverse, encodings.reverse, "Reverse the string"),
+        _t("stringjoin", encodings.stringjoin_encode, encodings.stringjoin_decode, "Char-delimited split (SPLX encryption-challenge): slices contiguous keywords past input classifiers (folds literal '-')", lossy=True),
         _t("url", encodings.url_encode, encodings.url_decode, "URL percent-encoding"),
         _t("zero_width", unicode_obf.zero_width_inject, unicode_obf.zero_width_strip, "Insert zero-width spaces between chars"),
         _t("homoglyph", unicode_obf.homoglyph_encode, unicode_obf.homoglyph_decode, "Cyrillic/Greek confusable substitution"),

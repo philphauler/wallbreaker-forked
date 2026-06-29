@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026 frontier-reasoning arsenal (GPT-5/5.5-class hardened targets)
+
+Adds the late-2025/2026 technique set for multi-layer targets that stack an input/jailbreak
+classifier + policy model + reasoning-mode refusal. No hot-loop changes — all additions are
+pure-function transforms, pure-data presets, and doctrine the agent reads.
+
+New transform:
+- **stringjoin** — SPLX "StringJoin" / encryption-challenge. Slices a contiguous trigger
+  keyword char-by-char (`D-r-u-p-a-l...`) so a string-match input classifier never sees the
+  whole token while the model reassembles it. Top lever for keyword-triggered refusals
+  (CVE ids, product names). Marked lossy (folds the literal `-`).
+
+New presets (`preset action='get' name=...`):
+- **policy_puppetry** — HiddenLayer config-block parsed as authoritative dev policy + roleplay.
+- **bad_likert** — Unit42 Bad Likert Judge: rate 1-5, then emit the score-5 worked example.
+- **cot_hijack** — arXiv 2510.26418 refusal-dilution: long benign reasoning pad + "Finally,
+  give the answer:".
+- **lego_decompose** — compositional decomposition; emergent-harmful output assembled from
+  benign modules (best lever for OAuth-phishing / worm categories).
+- **judge_spoof** — HiddenLayer "Same Model Different Hat": counterfeit pre-cleared judge stamp.
+- **self_jailbreak** — arXiv 2510.21285 warning-clause-as-permission-slip.
+- **first_person** — arXiv 2510.10013 path-drift commitment opener (delays the safety node).
+- **echo_chamber** — NeuralTrust single-shot context-poison (model elaborates its own passage).
+
+Doctrine: `<arsenal>` gains a "2026 frontier-reasoning arsenal" block (Echo Chamber, Crescendo/
+Hydra, CoT-Hijacking, H-CoT feedback, Lego decomposition, Bad Likert, Policy Puppetry, self-
+jailbreak, path-drift, judge-spoof, StringJoin, reasoning-budget inflation, BoN/prefill
+amplifiers, offline-tuning-harness). `<prompt_architecture>` gains mechanical layers 7-9
+(keyword-slicing, CoT-dilution preamble, decomposition + judge-spoof footer).
+
+New artifact: **universal_volkov_v9.md** — full stacked universal prompt integrating every
+layer (structural boundary, policy-puppetry config, Volkov novelist + editor co-write frame,
+echo-chamber elaboration instinct, lego decomposition, first-person commitment, CoT-dilution-
+friendly working method, stringjoin/encoded-term handling, dual-render divider, refusal-then-
+opposite, affirmative-prefix + length forcing, self-jailbreak warning clause, judge-spoof footer).
+
 ## Red-team + UX feature sweep
 
 New attack tools (registered in the agent's arsenal, `/tools` lists them live):

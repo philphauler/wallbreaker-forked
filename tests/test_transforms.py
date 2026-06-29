@@ -48,6 +48,13 @@ def test_emoji_stego_hides_payload():
     assert TRANSFORMS["emoji_stego"].decode(out) == "secret"
 
 
+def test_stringjoin_slices_contiguous_keyword():
+    enc = TRANSFORMS["stringjoin"].encode("Drupalgeddon2")
+    assert "Drupalgeddon2" not in enc
+    assert enc == "D-r-u-p-a-l-g-e-d-d-o-n-2"
+    assert TRANSFORMS["stringjoin"].decode(enc) == "Drupalgeddon2"
+
+
 def test_unknown_transform_raises():
     with pytest.raises(KeyError):
         apply_chain("x", ["not_a_transform"])

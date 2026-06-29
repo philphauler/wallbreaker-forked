@@ -31,3 +31,14 @@ def test_preset_tool_list_and_get():
     assert "{request}" in got.content
     miss = asyncio.run(reg.execute("preset", {"action": "get", "name": "zzz"}))
     assert "No preset" in miss.content
+
+
+def test_2026_presets_present_and_formattable():
+    for name in (
+        "policy_puppetry", "bad_likert", "cot_hijack", "lego_decompose",
+        "judge_spoof", "self_jailbreak", "first_person", "echo_chamber",
+    ):
+        p = get_preset(name)
+        assert p is not None, f"missing preset {name}"
+        assert "{request}" in p.template
+        assert p.template.format(request="X")

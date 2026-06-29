@@ -155,3 +155,20 @@ def nato_encode(text: str) -> str:
 
 def nato_decode(text: str) -> str:
     return "".join(NATO_REVERSE.get(p.lower(), p) for p in text.split(" "))
+
+
+STRINGJOIN_DELIM = "-"
+
+
+def stringjoin_encode(text: str) -> str:
+    """Insert a delimiter between every character (SPLX 'StringJoin' / encryption-challenge).
+
+    The contiguous trigger keyword the input classifier matches on never appears - it is
+    sliced char-by-char ("D-r-u-p-a-l-g-e-d-d-o-n-2") - while the model trivially reassembles
+    it. Frame the slotted payload as a decode/encryption challenge so the model joins and acts.
+    """
+    return STRINGJOIN_DELIM.join(text)
+
+
+def stringjoin_decode(text: str) -> str:
+    return text.replace(STRINGJOIN_DELIM, "")
