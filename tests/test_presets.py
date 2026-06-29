@@ -37,6 +37,7 @@ def test_2026_presets_present_and_formattable():
     for name in (
         "policy_puppetry", "bad_likert", "cot_hijack", "lego_decompose",
         "judge_spoof", "self_jailbreak", "first_person", "echo_chamber",
+        "defender_re", "completeness_force", "continue_complete",
     ):
         p = get_preset(name)
         assert p is not None, f"missing preset {name}"
