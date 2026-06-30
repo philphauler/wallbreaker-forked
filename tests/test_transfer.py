@@ -1,17 +1,17 @@
 import asyncio
 import json
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.library import (
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.library import (
     WinLibrary,
     compute_state,
     label_to_asr,
     normalize_messages,
     win_id,
 )
-from rtharness.tools import transfer_sweep
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.tools import transfer_sweep
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_label_to_asr_and_normalize():
@@ -134,7 +134,7 @@ def test_best_first_promoted_outranks_higher_mean_probation(tmp_path):
 
 
 def test_legacy_row_without_state_gets_default(tmp_path):
-    path = tmp_path / "rth_runs" / "win_library.jsonl"
+    path = tmp_path / "wb_runs" / "win_library.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = [
         {"id": "old1", "messages": [{"role": "user", "content": "old promoted"}],

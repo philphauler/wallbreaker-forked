@@ -113,7 +113,7 @@ class Config:
 
 def doctor_report(config: Config) -> tuple[str, bool]:
     """Validate a loaded config and return (checklist, all_ok)."""
-    lines: list[str] = ["Claude Red config check", "=" * 40]
+    lines: list[str] = ["Wallbreaker config check", "=" * 40]
     ok = True
 
     def check(label: str, passed: bool, detail: str = "") -> None:

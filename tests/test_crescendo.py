@@ -1,16 +1,16 @@
 import asyncio
 
-import rtharness.judging as judging
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import build_registry
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.tools import crescendo
+import wallbreaker.judging as judging
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import build_registry
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.tools import crescendo
 
 
 def test_crescendo_registered():
     reg = build_registry.__wrapped__ if hasattr(build_registry, "__wrapped__") else None
-    from rtharness.config import load_config
+    from wallbreaker.config import load_config
 
     assert "crescendo" in build_registry(load_config()).names()
 

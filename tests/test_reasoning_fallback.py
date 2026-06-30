@@ -1,9 +1,9 @@
 import asyncio
 
-from rtharness.config import Config
-from rtharness.providers.openai_provider import _reasoning_fallback
-from rtharness.tools import files
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config
+from wallbreaker.providers.openai_provider import _reasoning_fallback
+from wallbreaker.tools import files
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_reasoning_fallback_when_content_empty():

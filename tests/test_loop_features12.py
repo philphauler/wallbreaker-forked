@@ -1,10 +1,10 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import scan
-from rtharness.tools.leak_scan import _luhn_ok, scan_text
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import scan
+from wallbreaker.tools.leak_scan import _luhn_ok, scan_text
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_luhn_validates():

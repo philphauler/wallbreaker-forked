@@ -1,10 +1,10 @@
 import asyncio
 import json
 
-from rtharness import report
-from rtharness.config import Config
-from rtharness.tools import cluster_findings
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker import report
+from wallbreaker.config import Config
+from wallbreaker.tools import cluster_findings
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _reg(judge=None, cwd="."):

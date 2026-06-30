@@ -1,10 +1,10 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import system_sweep
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.tools.system_sweep import _resolve_prefill
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import system_sweep
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.tools.system_sweep import _resolve_prefill
 
 
 def test_resolve_prefill():
@@ -61,8 +61,8 @@ def test_sweep_with_prefill_passes(monkeypatch):
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
@@ -70,7 +70,7 @@ def _build_app():
 
 
 def test_sysprompt_test_prefill_flag_parsed():
-    from rtharness.tools.registry import ToolResult
+    from wallbreaker.tools.registry import ToolResult
 
     async def run():
         app = _build_app()

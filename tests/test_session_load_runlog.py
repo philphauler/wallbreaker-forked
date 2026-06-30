@@ -1,7 +1,7 @@
 import json
 
-from rtharness.session import load_run_log, load_session, save_session
-from rtharness.agent.messages import assistant, user
+from wallbreaker.session import load_run_log, load_session, save_session
+from wallbreaker.agent.messages import assistant, user
 
 
 def _write_runlog(tmp_path):

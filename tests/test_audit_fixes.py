@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness.config import Config, Endpoint
-from rtharness.tools import files, target
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import files, target
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _files_reg(tmp_path):
@@ -45,7 +45,7 @@ class _BoomTarget:
 
 
 def test_query_target_timeout_returns_clean(monkeypatch):
-    import rtharness.providers.factory as factory
+    import wallbreaker.providers.factory as factory
 
     monkeypatch.setattr(factory, "build_provider", _BoomTarget)
     ep = Endpoint("t", "openai", "http://x", "m")

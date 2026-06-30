@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness.config import Config
-from rtharness.tools import files
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config
+from wallbreaker.tools import files
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _reg(tmp_path):

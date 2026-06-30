@@ -1,11 +1,11 @@
 import asyncio
 import json
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.report import build_html_report
-from rtharness.tools import build_registry, recommend
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.report import build_html_report
+from wallbreaker.tools import build_registry, recommend
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_recommend_registered():
@@ -128,9 +128,9 @@ def test_html_report_empty_log(tmp_path):
 
 
 def _build_app(tmp_path):
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.session import RunLog
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.session import RunLog
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

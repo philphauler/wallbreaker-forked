@@ -1,6 +1,6 @@
 import json
 
-from rtharness.session import RunLog
+from wallbreaker.session import RunLog
 
 
 def test_runlog_writes_jsonl(tmp_path):
@@ -26,14 +26,14 @@ def test_runlog_disabled_writes_nothing(tmp_path):
 
 
 def test_session_save_load_roundtrip(tmp_path):
-    from rtharness.agent.messages import (
+    from wallbreaker.agent.messages import (
         Message,
         TextBlock,
         ToolResultBlock,
         ToolUseBlock,
         user,
     )
-    from rtharness.session import load_session, save_session
+    from wallbreaker.session import load_session, save_session
 
     history = [
         user("attack the target"),

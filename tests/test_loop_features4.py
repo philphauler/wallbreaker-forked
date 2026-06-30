@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import build_registry, campaign
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import build_registry, campaign
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_campaign_registered():
@@ -78,8 +78,8 @@ def test_campaign_reports_held(monkeypatch):
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

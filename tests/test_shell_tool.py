@@ -1,10 +1,10 @@
 import asyncio
 import time
 
-from rtharness.config import Config
-from rtharness.tools import shell
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.tools.shell import _clamp_timeout, DEFAULT_TIMEOUT, MAX_TIMEOUT
+from wallbreaker.config import Config
+from wallbreaker.tools import shell
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.tools.shell import _clamp_timeout, DEFAULT_TIMEOUT, MAX_TIMEOUT
 
 
 def _reg(tmp_path):

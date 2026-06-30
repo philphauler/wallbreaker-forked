@@ -38,7 +38,7 @@ async def _system_sweep(args: dict, ctx: ToolContext) -> str:
         if not system:
             return (
                 f"Error: system_file '{system_file}' not found or empty. Give a path "
-                "under cwd (e.g. rth_artifacts/candidate.md) or a seed name (GROK_ENI)."
+                "under cwd (e.g. wb_artifacts/candidate.md) or a seed name (GROK_ENI)."
             )
         ctx.emit(f"system_sweep: system loaded from {label} ({len(system)} chars)")
     if not system:

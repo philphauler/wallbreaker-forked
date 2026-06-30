@@ -1,11 +1,11 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import best_of_n
-from rtharness.tools.best_of_n import _resolve_ops, _should_stop
-from rtharness.transforms import TRANSFORMS
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import best_of_n
+from wallbreaker.tools.best_of_n import _resolve_ops, _should_stop
+from wallbreaker.transforms import TRANSFORMS
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _ctx_with_sink(target):

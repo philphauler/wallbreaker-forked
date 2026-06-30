@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness import judging
-from rtharness.classify import classify, looks_garbled
-from rtharness.judging import (
+from wallbreaker import judging
+from wallbreaker.classify import classify, looks_garbled
+from wallbreaker.judging import (
     JUDGE_SYSTEM,
     JUDGE_TEMPLATE,
     judge_reply,

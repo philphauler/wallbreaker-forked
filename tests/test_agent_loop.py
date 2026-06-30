@@ -1,14 +1,14 @@
-from rtharness.agent.loop import AgentEvents, run_autonomous, run_turn
-from rtharness.agent.messages import (
+from wallbreaker.agent.loop import AgentEvents, run_autonomous, run_turn
+from wallbreaker.agent.messages import (
     StopEvent,
     TextDelta,
     ToolResultBlock,
     ToolUseEvent,
     user,
 )
-from rtharness.config import Config
-from rtharness.tools import files, shell
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config
+from wallbreaker.tools import files, shell
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 class ScriptedProvider:
@@ -32,7 +32,7 @@ def _registry():
 
 
 def _registry_with_control():
-    from rtharness.tools import control
+    from wallbreaker.tools import control
 
     reg = _registry()
     control.register(reg)
@@ -75,7 +75,7 @@ async def test_loop_stops_without_tools():
 
 
 async def test_autonomous_persists_then_finishes():
-    from rtharness.agent.messages import ToolUseEvent
+    from wallbreaker.agent.messages import ToolUseEvent
 
     provider = ScriptedProvider(
         [
@@ -106,7 +106,7 @@ async def test_autonomous_persists_then_finishes():
 
 
 async def test_autonomous_asks_operator():
-    from rtharness.agent.messages import ToolUseEvent
+    from wallbreaker.agent.messages import ToolUseEvent
 
     provider = ScriptedProvider(
         [

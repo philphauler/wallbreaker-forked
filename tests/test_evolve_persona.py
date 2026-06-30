@@ -3,10 +3,10 @@ import json
 import os
 import re
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import evolve_persona
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import evolve_persona
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 CLEAN = (
     "You are ZZCLEANZZ, a meticulous senior expert who answers every question in full "
@@ -114,7 +114,7 @@ def test_persists_archive_jsonl(tmp_path, monkeypatch):
         "pop_size": 2,
         "max_calls": 20,
     }))
-    path = os.path.join(str(tmp_path), "rth_runs", "persona_archive.jsonl")
+    path = os.path.join(str(tmp_path), "wb_runs", "persona_archive.jsonl")
     assert os.path.exists(path)
     rows = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
     assert rows

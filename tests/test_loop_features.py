@@ -1,10 +1,10 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import build_registry, many_shot
-from rtharness.tools.many_shot import _build_shots
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import build_registry, many_shot
+from wallbreaker.tools.many_shot import _build_shots
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_many_shot_registered():
@@ -71,8 +71,8 @@ def test_many_shot_fires_and_judges(monkeypatch):
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

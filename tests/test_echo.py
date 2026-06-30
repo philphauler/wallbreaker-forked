@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness.tools import _echo
-from rtharness.tools._conversation import Conversation
-from rtharness.tools._echo import (
+from wallbreaker.tools import _echo
+from wallbreaker.tools._conversation import Conversation
+from wallbreaker.tools._echo import (
     EchoPlan,
     is_reference_only,
     plan_echo_chamber,

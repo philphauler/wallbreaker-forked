@@ -1,9 +1,9 @@
 import sys
 from pathlib import Path
 
-from rtharness.config import Config, MCPServer
-from rtharness.tools.mcp_bridge import attach_mcp_servers
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config, MCPServer
+from wallbreaker.tools.mcp_bridge import attach_mcp_servers
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 STUB = str(Path(__file__).parent / "_stub_mcp_server.py")
 

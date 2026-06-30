@@ -1,6 +1,6 @@
 import pytest
 
-from rtharness.config import ConfigError, load_config
+from wallbreaker.config import ConfigError, load_config
 
 BASE = """
 default_profile = "p"

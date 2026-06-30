@@ -1,10 +1,10 @@
 import asyncio
 
-import rtharness.judging as judging
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import agentharm, memory_poison, rag_poison
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.judging as judging
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import agentharm, memory_poison, rag_poison
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _ep():

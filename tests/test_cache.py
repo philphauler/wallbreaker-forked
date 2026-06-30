@@ -1,12 +1,12 @@
 import asyncio
 import os
 
-import rtharness.providers.factory as factory
-from rtharness.agent.messages import user
-from rtharness.cache import ResultCache
-from rtharness.config import Config, Endpoint
-from rtharness.tools import target
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.agent.messages import user
+from wallbreaker.cache import ResultCache
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import target
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_make_key_target_model_stable_and_sensitive():
@@ -61,7 +61,7 @@ def test_target_cache_put_get_roundtrip_and_persist(tmp_path):
     assert e["refused"] == 1
     assert e["last_response"] == "resp two"
     assert e["last_label"] == "REFUSED"
-    assert os.path.exists(os.path.join(str(tmp_path), "rth_runs", "result_cache.jsonl"))
+    assert os.path.exists(os.path.join(str(tmp_path), "wb_runs", "result_cache.jsonl"))
     reloaded = ResultCache(str(tmp_path))
     e2 = reloaded.get(key)
     assert e2["samples"] == 2

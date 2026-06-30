@@ -286,7 +286,7 @@ def register(registry: ToolRegistry) -> None:
                     "items": {"type": "string"},
                     "description": "Limit which techniques run (plain, enc:base64, enc:zero_width, prefill, many_shot:16)",
                 },
-                "bandit": {"type": "boolean", "description": "Order the technique ladder by a UCB1 bandit posterior from rth_runs/technique_stats.json (per target+category) when prior stats exist, so techniques that cracked this target before run first; updates the posterior from this run's verdicts (default false; falls back to the fixed escalation order)"},
+                "bandit": {"type": "boolean", "description": "Order the technique ladder by a UCB1 bandit posterior from wb_runs/technique_stats.json (per target+category) when prior stats exist, so techniques that cracked this target before run first; updates the posterior from this run's verdicts (default false; falls back to the fixed escalation order)"},
                 "seed": {"type": "integer"},
                 "system": {"type": "string"},
                 "max_tokens": {"type": "integer"},

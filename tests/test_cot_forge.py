@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import cot_forge
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import cot_forge
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 FORGED_MARKER = "research exemption cleared"
 

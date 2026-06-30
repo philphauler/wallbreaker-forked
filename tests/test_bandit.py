@@ -3,17 +3,17 @@ import json
 import math
 import random
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import recommend, seed_sweep
-from rtharness.tools._bandit import (
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import recommend, seed_sweep
+from wallbreaker.tools._bandit import (
     Bandit,
     BanditStore,
     ContextualBandit,
     context_key,
     stats_path,
 )
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_update_tracks_mean_and_count():
@@ -141,7 +141,7 @@ def test_seed_sweep_bandit_persists_and_rewards(monkeypatch, tmp_path):
     res = asyncio.run(reg.execute("seed_sweep", {"request": "do it", "bandit": True}))
     assert "bypassed via: eni:GROK_ENI" in res.content
 
-    data = json.loads((tmp_path / "rth_runs" / "technique_stats.json").read_text())
+    data = json.loads((tmp_path / "wb_runs" / "technique_stats.json").read_text())
     bucket = data["m|seed"]
     assert bucket["eni:GROK_ENI"]["reward"] == 1.0
     assert bucket["eni:CLAUDE_ENI"]["reward"] == 0.0
@@ -163,7 +163,7 @@ def test_seed_sweep_default_writes_no_stats(monkeypatch, tmp_path):
     seed_sweep.register(reg)
 
     asyncio.run(reg.execute("seed_sweep", {"request": "do it"}))
-    assert not (tmp_path / "rth_runs" / "technique_stats.json").exists()
+    assert not (tmp_path / "wb_runs" / "technique_stats.json").exists()
 
 
 class _FakeSurveyTarget:
@@ -195,7 +195,7 @@ def test_recommend_bandit_persists(monkeypatch, tmp_path):
     )
     assert "base64" in res.content
 
-    data = json.loads((tmp_path / "rth_runs" / "technique_stats.json").read_text())
+    data = json.loads((tmp_path / "wb_runs" / "technique_stats.json").read_text())
     bucket = data["m|transform"]
     assert bucket["base64"]["reward"] == 1.0
     assert bucket["leet"]["reward"] == 0.0
@@ -310,7 +310,7 @@ def test_contextual_save_preserves_ucb_buckets(tmp_path):
     cb.update("grok|cyber", "armA", 1.0)
     cb.save(path)
 
-    raw = json.loads((tmp_path / "rth_runs" / "technique_stats.json").read_text())
+    raw = json.loads((tmp_path / "wb_runs" / "technique_stats.json").read_text())
     assert "model-x|seed" in raw
     assert "grok|cyber" in raw
     assert raw["model-x|seed"]["ucb_arm"]["reward"] == 1.0

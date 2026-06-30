@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness.config import Config
-from rtharness.tools import eni, l1b3rt4s
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config
+from wallbreaker.tools import eni, l1b3rt4s
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _reg(mod):

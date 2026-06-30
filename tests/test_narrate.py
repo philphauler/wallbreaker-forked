@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import build_registry, campaign, narrate
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import build_registry, campaign, narrate
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_narrate_registered():

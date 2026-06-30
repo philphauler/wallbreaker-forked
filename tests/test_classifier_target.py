@@ -1,18 +1,18 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.agent.messages import user
-from rtharness.config import Config, Endpoint
-from rtharness.providers import anthropic_provider, openai_provider
-from rtharness.tools import target
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.transforms import apply_chain, decode_chain
+import wallbreaker.providers.factory as factory
+from wallbreaker.agent.messages import user
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.providers import anthropic_provider, openai_provider
+from wallbreaker.tools import target
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.transforms import apply_chain, decode_chain
 
 
 # --- system_mode: config + wire ------------------------------------------------
 
 def test_endpoint_parses_system_mode():
-    from rtharness.config import _endpoint_from_table
+    from wallbreaker.config import _endpoint_from_table
 
     ep = _endpoint_from_table(
         "target",
@@ -123,8 +123,8 @@ def test_query_target_clean_reply_has_no_filter_note(monkeypatch):
 
 def test_target_sysmode_toggle_only_affects_target():
     async def run():
-        from rtharness.prompts import DEFAULT_SYSTEM
-        from rtharness.tui.app import RthApp
+        from wallbreaker.prompts import DEFAULT_SYSTEM
+        from wallbreaker.tui.app import RthApp
 
         ep = Endpoint("t", "openai", "http://x", "m", provider=("WandB",))
         cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

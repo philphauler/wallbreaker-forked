@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import build_registry, target
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import build_registry, target
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_continue_target_registered():
@@ -69,7 +69,7 @@ def test_continue_target_error_pops_dangling_turn(monkeypatch):
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
     ctx = ToolContext(config=cfg)
     # seed an open thread
-    from rtharness.agent.messages import assistant, user
+    from wallbreaker.agent.messages import assistant, user
     ctx.target_thread = [user("hi"), assistant("ok")]
     reg = ToolRegistry(ctx)
     target.register(reg)

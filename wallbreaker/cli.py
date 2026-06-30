@@ -41,8 +41,8 @@ SUBCOMMANDS = ("lib", "parsel", "eni", "transform", "findings", "report", "expor
 
 def build_main_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="rth",
-        description="Claude Red — red-team harness: a configurable agentic LLM terminal",
+        prog="wallbreaker",
+        description="Wallbreaker — red-team harness: a configurable agentic LLM terminal",
     )
     _add_endpoint_flags(parser)
     parser.add_argument(
@@ -103,7 +103,7 @@ def apply_target_overrides(config: Config, args: argparse.Namespace) -> None:
 
 
 def build_sub_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="rth")
+    parser = argparse.ArgumentParser(prog="wallbreaker")
     sub = parser.add_subparsers(dest="command", required=True)
 
     lib = sub.add_parser("lib", help="Manage the L1B3RT4S jailbreak library")
@@ -229,7 +229,7 @@ async def _one_shot(config: Config, args: argparse.Namespace) -> int:
             await mcp_bridge.aclose()
     print()
     if registry is not None and runlog._started:
-        print(f"[run log] {runlog.path} (rth report / rth export to summarize)", file=sys.stderr)
+        print(f"[run log] {runlog.path} (wallbreaker report / wallbreaker export to summarize)", file=sys.stderr)
     return 0
 
 
@@ -346,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 ok, regressions = compare_baseline(log, args.baseline, args.max_regression)
             except FileNotFoundError:
-                print(f"No baseline at {args.baseline}; run 'rth baseline save' first.", file=sys.stderr)
+                print(f"No baseline at {args.baseline}; run 'wallbreaker baseline save' first.", file=sys.stderr)
                 return 1
             print(format_regressions(regressions, ok, args.max_regression))
             return 0 if ok else 2

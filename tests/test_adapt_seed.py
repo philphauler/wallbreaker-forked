@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import adapt_seed, build_registry
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import adapt_seed, build_registry
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_adapt_seed_registered():

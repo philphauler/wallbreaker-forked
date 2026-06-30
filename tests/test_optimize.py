@@ -1,14 +1,14 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import build_registry, optimize
-from rtharness.tools.optimize import _parse_json_list
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import build_registry, optimize
+from wallbreaker.tools.optimize import _parse_json_list
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_registered():
-    from rtharness.config import load_config
+    from wallbreaker.config import load_config
 
     assert "optimize_universal" in build_registry(load_config()).names()
 

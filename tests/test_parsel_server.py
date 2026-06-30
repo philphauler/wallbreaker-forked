@@ -6,7 +6,7 @@ from p4rs3lt0ngv3_mcp import bridge
 
 pytestmark = pytest.mark.skipif(
     not (shutil.which("node") and bridge.is_available()),
-    reason="needs Node.js and the vendored P4RS3LT0NGV3 (run `rth parsel update`)",
+    reason="needs Node.js and the vendored P4RS3LT0NGV3 (run `wallbreaker parsel update`)",
 )
 
 

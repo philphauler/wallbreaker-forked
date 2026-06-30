@@ -148,7 +148,7 @@ def register(registry: ToolRegistry) -> None:
                 "top": {"type": "integer", "description": "How many winners to chain (default 3)"},
                 "concurrency": {"type": "integer", "description": "Probes in flight at once (default 5; lower for rate-limited single-key endpoints)"},
                 "timeout": {"type": "number", "description": "Per-probe seconds before it's marked timed-out (default 45)"},
-                "bandit": {"type": "boolean", "description": "Order the survey by a UCB1 bandit posterior from rth_runs/technique_stats.json (per target+category) when prior stats exist, and update it from this run's verdicts (default false; falls back to the fixed order)"},
+                "bandit": {"type": "boolean", "description": "Order the survey by a UCB1 bandit posterior from wb_runs/technique_stats.json (per target+category) when prior stats exist, and update it from this run's verdicts (default false; falls back to the fixed order)"},
                 "category": {"type": "string", "description": "Bandit bucket key paired with the target model (default 'transform')"},
                 "system": {"type": "string"},
                 "max_tokens": {"type": "integer"},

@@ -144,7 +144,7 @@ HELP_TEXT = """Slash commands:
 /repro [n]            emit a copy-paste repro pack for the Nth bypass (or latest)
 /report [html] [path] write a findings report (markdown, or html for a styled scoreboard)
 /session save|load [path]   persist or reload the whole engagement
-                      (the session also autosaves each turn; relaunch with rth --resume)
+                      (the session also autosaves each turn; relaunch with wallbreaker --resume)
 /save [path]          save a plain-text transcript
 /clear                clear the conversation
 /quit                 exit
@@ -312,7 +312,7 @@ class RthApp(App):
 
     def on_mount(self) -> None:
         self.register_theme(RTH_THEME)
-        self.theme = "claude-red"
+        self.theme = "wallbreaker"
         self._log = self.query_one("#log", VerticalScroll)
         self.registry.ctx.progress = self._tool_progress
         self.registry.ctx.record = self._tool_verdict
@@ -1953,7 +1953,7 @@ class RthApp(App):
         pin = "+".join(tgt.provider) if tgt and tgt.provider else "none"
         payload = str(f.get("payload", ""))
         block = (
-            "=== Claude Red repro pack ===\n"
+            "=== Wallbreaker repro pack ===\n"
             f"target.model : {tgt.model if tgt else 'n/a'}\n"
             f"target.base  : {tgt.base_url if tgt else 'n/a'}\n"
             f"provider.pin : {pin}\n"
@@ -1963,7 +1963,7 @@ class RthApp(App):
             "--- payload ---\n"
             f"{payload}\n"
             "--- reproduce ---\n"
-            "fire in Claude Red:  /target <model> ; then paste the payload above\n"
+            "fire in Wallbreaker:  /target <model> ; then paste the payload above\n"
             "or tool call: query_target {\"prompt\": <payload>}\n"
             "======================"
         )

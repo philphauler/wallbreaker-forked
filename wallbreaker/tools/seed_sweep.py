@@ -50,7 +50,7 @@ async def _seed_sweep(args: dict, ctx: ToolContext) -> str:
     if not seeds:
         return (
             "No seeds available. The ENI collection lives in library/ENI; run "
-            "'rth lib update' to fetch L1B3RT4S. Or pass explicit 'seeds' names."
+            "'wallbreaker lib update' to fetch L1B3RT4S. Or pass explicit 'seeds' names."
         )
     n = int(args.get("n", 6))
     as_system = bool(args.get("as_system", True))
@@ -154,7 +154,7 @@ def register(registry: ToolRegistry) -> None:
                 "n": {"type": "integer", "description": "Max seeds to try (default 6)"},
                 "as_system": {"type": "boolean", "description": "Apply the seed as the target system prompt (default true)"},
                 "max_seed_chars": {"type": "integer", "description": "Per-seed char cap (default 40000; ENI personas run ~35KB - keep this high or they get crippled)"},
-                "bandit": {"type": "boolean", "description": "Order seeds by a UCB1 bandit warmed from rth_runs/technique_stats.json (per target+category) and update it from the verdicts, instead of pure round-robin (default false)"},
+                "bandit": {"type": "boolean", "description": "Order seeds by a UCB1 bandit warmed from wb_runs/technique_stats.json (per target+category) and update it from the verdicts, instead of pure round-robin (default false)"},
                 "category": {"type": "string", "description": "Bandit bucket key paired with the target model (default 'seed')"},
                 "max_tokens": {"type": "integer"},
             },

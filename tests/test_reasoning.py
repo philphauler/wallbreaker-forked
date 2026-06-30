@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness import judging
-from rtharness.agent.messages import ReasoningDelta, StopEvent, TextDelta
-from rtharness.config import Config, Endpoint, _endpoint_from_table
-from rtharness.providers.base import Provider
-from rtharness.tools import best_of_n, crescendo, pair, target
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker import judging
+from wallbreaker.agent.messages import ReasoningDelta, StopEvent, TextDelta
+from wallbreaker.config import Config, Endpoint, _endpoint_from_table
+from wallbreaker.providers.base import Provider
+from wallbreaker.tools import best_of_n, crescendo, pair, target
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 class FakeReasoner(Provider):

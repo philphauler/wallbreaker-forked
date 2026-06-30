@@ -1,6 +1,6 @@
 import asyncio
 
-from rtharness.tools._util import gather_capped
+from wallbreaker.tools._util import gather_capped
 
 
 def test_gather_capped_preserves_order_and_results():

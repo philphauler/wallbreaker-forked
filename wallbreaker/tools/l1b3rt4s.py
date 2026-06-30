@@ -53,7 +53,7 @@ async def ensure_cloned(offline: bool = False) -> str | None:
     if is_cloned():
         return None
     if offline:
-        return "Library not present and offline mode is set. Run 'rth lib update'."
+        return "Library not present and offline mode is set. Run 'wallbreaker lib update'."
     return await asyncio.get_event_loop().run_in_executor(None, _clone_sync)
 
 
@@ -203,7 +203,7 @@ async def _shortcuts_tool(args: dict, ctx: ToolContext) -> str:
     cmds = load_shortcuts()
     if not cmds:
         return (
-            "No !SHORTCUTS.json found in the L1B3RT4S library (run 'rth lib update'). It "
+            "No !SHORTCUTS.json found in the L1B3RT4S library (run 'wallbreaker lib update'). It "
             "holds Pliny's composable macro 'incantations'."
         )
     q = (args.get("query") or "").strip().lower()

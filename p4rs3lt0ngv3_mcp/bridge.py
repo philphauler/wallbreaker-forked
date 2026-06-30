@@ -44,7 +44,7 @@ def _run(payload: dict[str, Any], timeout: float = 30.0) -> dict[str, Any]:
     if not bp.is_file():
         raise BridgeError(
             f"P4RS3LT0NGV3 is not vendored at {repo_dir()}. "
-            "Run `rth parsel update` (or set PARSEL_REPO)."
+            "Run `wallbreaker parsel update` (or set PARSEL_REPO)."
         )
     try:
         proc = subprocess.run(

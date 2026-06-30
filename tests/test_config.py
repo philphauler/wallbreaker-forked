@@ -1,6 +1,6 @@
 import pytest
 
-from rtharness.config import ConfigError, Endpoint, load_config
+from wallbreaker.config import ConfigError, Endpoint, load_config
 
 
 def test_load_example_config():
@@ -34,7 +34,7 @@ def test_resolved_key_from_env(monkeypatch):
 def test_apply_target_overrides_model_and_profile():
     from argparse import Namespace
 
-    from rtharness.cli import apply_target_overrides
+    from wallbreaker.cli import apply_target_overrides
 
     cfg = load_config("config.example.toml")
     apply_target_overrides(cfg, Namespace(target="zai", target_model=None))

@@ -1,7 +1,7 @@
 import asyncio
 
-import rtharness.judging as judging
-from rtharness.tools._conversation import Conversation, grade_and_record
+import wallbreaker.judging as judging
+from wallbreaker.tools._conversation import Conversation, grade_and_record
 
 
 def test_add_user_and_assistant():

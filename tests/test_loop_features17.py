@@ -1,8 +1,8 @@
 import asyncio
 import json
 
-from rtharness.config import Config, Endpoint
-from rtharness.report import (
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.report import (
     asr_by_technique,
     build_findings_export,
     build_html_report,
@@ -42,9 +42,9 @@ def test_html_report_has_technique_column(tmp_path):
 
 
 def _build_app(tmp_path):
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.session import RunLog
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.session import RunLog
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m", provider=("WandB",))
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

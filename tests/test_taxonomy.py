@@ -1,4 +1,4 @@
-from rtharness import taxonomy
+from wallbreaker import taxonomy
 
 
 def test_tag_category_maps_to_owasp_and_atlas():

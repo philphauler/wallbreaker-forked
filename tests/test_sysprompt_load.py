@@ -1,12 +1,12 @@
 import asyncio
 
-from rtharness.config import Config, Endpoint
-from rtharness.tools.registry import ToolResult
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools.registry import ToolResult
 
 
 def _build_app(tmp_path):
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

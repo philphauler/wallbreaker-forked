@@ -1,9 +1,9 @@
 import asyncio
 
-from rtharness.config import Config
-from rtharness.tools import chat_template
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.transforms import TRANSFORMS
+from wallbreaker.config import Config
+from wallbreaker.tools import chat_template
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.transforms import TRANSFORMS
 
 
 def test_control_char_flood_inserts_and_strips():

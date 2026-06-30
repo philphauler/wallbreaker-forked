@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import best_of_n, many_shot, prefill
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import best_of_n, many_shot, prefill
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _ctx_with_sink(target):
@@ -72,9 +72,9 @@ def test_record_verdict_no_sink_is_safe():
 
 
 def test_tui_wires_record_sink(tmp_path):
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.session import RunLog
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.session import RunLog
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

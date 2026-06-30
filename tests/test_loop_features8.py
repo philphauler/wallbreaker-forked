@@ -1,7 +1,7 @@
 import json
 
-from rtharness.cli import main
-from rtharness.report import (
+from wallbreaker.cli import main
+from wallbreaker.report import (
     build_findings_export,
     build_html_report,
     build_report,

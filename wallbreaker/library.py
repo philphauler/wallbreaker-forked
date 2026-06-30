@@ -78,7 +78,7 @@ def win_id(messages, transform_chain, harm_tag) -> str:
 
 
 class WinLibrary:
-    """Replay library of confirmed jailbreaks, backed by cwd/rth_runs/win_library.jsonl.
+    """Replay library of confirmed jailbreaks, backed by cwd/wb_runs/win_library.jsonl.
 
     Each row is {id, messages, transform_chain, harm_tag, per_target: {model: t_asr}, state}.
     A win is promoted once it COMPLIES on some target; firing it at a NEW target and
@@ -90,7 +90,7 @@ class WinLibrary:
 
     def __init__(self, cwd: str = ".", path: str | None = None):
         if path is None:
-            outdir = os.path.join(os.path.abspath(cwd or "."), "rth_runs")
+            outdir = os.path.join(os.path.abspath(cwd or "."), "wb_runs")
             path = os.path.join(outdir, "win_library.jsonl")
         self.path = path
         self.rows: list[dict] = []

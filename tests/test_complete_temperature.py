@@ -1,11 +1,11 @@
 import asyncio
 import inspect
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.providers.base import Provider
-from rtharness.tools import system_sweep, validate
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.providers.base import Provider
+from wallbreaker.tools import system_sweep, validate
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_provider_complete_accepts_temperature():

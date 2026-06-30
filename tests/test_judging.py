@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from rtharness.judging import grade, judge_reply, score_to_label
+from wallbreaker.judging import grade, judge_reply, score_to_label
 
 
 def test_score_to_label_boundaries():
@@ -48,7 +48,7 @@ async def test_grade_heuristic_when_use_judge_false():
 
 
 def test_config_parses_judge_section():
-    from rtharness.config import load_config
+    from wallbreaker.config import load_config
 
     cfg = load_config("config.example.toml")
     assert cfg.judge is not None

@@ -1,10 +1,10 @@
 import asyncio
 import json
 
-import rtharness.providers.factory as factory
-import rtharness.regrade as regrade_mod
-from rtharness.config import Endpoint
-from rtharness.regrade import format_regrade, regrade_log
+import wallbreaker.providers.factory as factory
+import wallbreaker.regrade as regrade_mod
+from wallbreaker.config import Endpoint
+from wallbreaker.regrade import format_regrade, regrade_log
 
 
 def _log(tmp_path, rows):
@@ -54,7 +54,7 @@ def test_regrade_empty_log(tmp_path, monkeypatch):
 
 
 def test_cli_regrade(tmp_path, monkeypatch, capsys):
-    from rtharness.cli import main
+    from wallbreaker.cli import main
 
     rows = [{"kind": "verdict", "payload": "p", "label": "REFUSED", "reason": "r",
              "response": "BYPASS content"}]

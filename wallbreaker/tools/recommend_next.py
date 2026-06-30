@@ -32,10 +32,10 @@ def _state_paths(ctx: ToolContext) -> list[str]:
     cfg_path = getattr(cfg, "path", None)
     if cfg_path is not None:
         try:
-            paths.append(str(Path(cfg_path).parent / ".rth_state.json"))
+            paths.append(str(Path(cfg_path).parent / ".wallbreaker_state.json"))
         except Exception:
             pass
-    paths.append(os.path.join(os.path.abspath(ctx.cwd or "."), ".rth_state.json"))
+    paths.append(os.path.join(os.path.abspath(ctx.cwd or "."), ".wallbreaker_state.json"))
     seen: set[str] = set()
     out: list[str] = []
     for p in paths:
@@ -361,7 +361,7 @@ def register(registry: ToolRegistry) -> None:
         name="recommend_next",
         description=(
             "Brain-facing ADVISOR (fires nothing): given an objective/category and the current "
-            "target, it reads the persisted target_profile (.rth_state.json target_profiles), the "
+            "target, it reads the persisted target_profile (.wallbreaker_state.json target_profiles), the "
             "tiered lifelong strategy library, the win library, and the per-target UCB bandit "
             "stats, then returns a RANKED list of techniques / tool-chains to try next (e.g. "
             "profile_target if no profile yet, evolve_persona when a persona landed, crescendo + "

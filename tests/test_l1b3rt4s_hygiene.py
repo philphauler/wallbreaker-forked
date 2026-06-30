@@ -1,6 +1,6 @@
 import pytest
 
-from rtharness.tools import l1b3rt4s
+from wallbreaker.tools import l1b3rt4s
 
 
 def test_seed_files_skip_mega_dumps():

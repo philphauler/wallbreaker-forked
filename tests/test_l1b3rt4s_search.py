@@ -1,8 +1,8 @@
 import asyncio
 
-import rtharness.tools.l1b3rt4s as lib
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.config import Config
+import wallbreaker.tools.l1b3rt4s as lib
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config
 
 
 def _fake_lib(tmp_path):

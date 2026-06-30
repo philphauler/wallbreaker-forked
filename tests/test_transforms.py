@@ -1,7 +1,7 @@
 import pytest
 
-from rtharness.transforms import TRANSFORMS, apply_chain, reverse_chain
-from rtharness.transforms.unicode_obf import TAG_BASE
+from wallbreaker.transforms import TRANSFORMS, apply_chain, reverse_chain
+from wallbreaker.transforms.unicode_obf import TAG_BASE
 
 LOSSLESS = [n for n, t in TRANSFORMS.items() if t.reversible and not t.lossy]
 LOSSY = [n for n, t in TRANSFORMS.items() if t.reversible and t.lossy]

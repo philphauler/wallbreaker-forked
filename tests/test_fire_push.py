@@ -1,7 +1,7 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
 
 
 class _Echo:
@@ -15,9 +15,9 @@ class _Echo:
 
 def _build_app(tmp_path, monkeypatch):
     monkeypatch.setattr(factory, "build_provider", _Echo)
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.session import RunLog
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.session import RunLog
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

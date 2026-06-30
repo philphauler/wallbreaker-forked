@@ -155,7 +155,7 @@ class StrategyLibrary:
     n_uses, tier, avoid_rule}. Each row carries an ASTRA-style tier in
     {effective, promising, ineffective}; ineffective rows distilled from a refusal also
     carry an avoid_rule (the reason the target gave). The file persists under
-    cwd/rth_runs/ so attack strategies discovered in one run are retrievable in the next,
+    cwd/wb_runs/ so attack strategies discovered in one run are retrievable in the next,
     compounding ASR over time (AutoDAN-Turbo + ASTRA distill-from-failure).
     """
 
@@ -166,7 +166,7 @@ class StrategyLibrary:
 
     @classmethod
     def for_cwd(cls, cwd: str | None) -> "StrategyLibrary":
-        outdir = os.path.join(os.path.abspath(cwd or "."), "rth_runs")
+        outdir = os.path.join(os.path.abspath(cwd or "."), "wb_runs")
         return cls(os.path.join(outdir, _LIBRARY_NAME))
 
     def load(self) -> None:

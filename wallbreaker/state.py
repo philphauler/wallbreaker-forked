@@ -4,7 +4,7 @@ import dataclasses
 import json
 from pathlib import Path
 
-STATE_FILENAME = ".rth_state.json"
+STATE_FILENAME = ".wallbreaker_state.json"
 
 
 def state_path_for(config) -> Path:

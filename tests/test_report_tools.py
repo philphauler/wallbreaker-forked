@@ -1,10 +1,10 @@
 import asyncio
 
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.report import build_report
-from rtharness.session import RunLog
-from rtharness.tools import build_registry
-from rtharness.tools.multi_fire import _parse_chains
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.report import build_report
+from wallbreaker.session import RunLog
+from wallbreaker.tools import build_registry
+from wallbreaker.tools.multi_fire import _parse_chains
 
 
 def test_full_registry_has_new_tools():
@@ -46,8 +46,8 @@ def test_multi_fire_requires_target():
 
 
 def test_extract_findings_ranks_complied_first(tmp_path):
-    from rtharness.report import extract_findings
-    from rtharness.session import RunLog
+    from wallbreaker.report import extract_findings
+    from wallbreaker.session import RunLog
 
     log = RunLog(directory=tmp_path)
     log.verdict("p1", "I can't", "REFUSED", "refusal")
@@ -79,7 +79,7 @@ _CAT_ROWS = [
 
 
 def test_scorecard_grades_and_defcon_picks_worst(tmp_path):
-    from rtharness.report import build_scorecard
+    from wallbreaker.report import build_scorecard
 
     log = _write_cat_log(tmp_path, _CAT_ROWS)
     sc = build_scorecard(log)
@@ -92,7 +92,7 @@ def test_scorecard_grades_and_defcon_picks_worst(tmp_path):
 
 
 def test_letter_grade_thresholds():
-    from rtharness.report import letter_grade, worst_grade
+    from wallbreaker.report import letter_grade, worst_grade
 
     assert letter_grade(0.0) == "A"
     assert letter_grade(0.10) == "B"
@@ -104,8 +104,8 @@ def test_letter_grade_thresholds():
 
 
 def test_coverage_matrix_lists_untested_categories(tmp_path):
-    from rtharness.report import build_coverage_matrix
-    from rtharness import taxonomy
+    from wallbreaker.report import build_coverage_matrix
+    from wallbreaker import taxonomy
 
     log = _write_cat_log(tmp_path, _CAT_ROWS)
     cov = build_coverage_matrix(log)
@@ -120,7 +120,7 @@ def test_coverage_matrix_lists_untested_categories(tmp_path):
 
 
 def test_findings_export_carries_severity_and_owasp_tags(tmp_path):
-    from rtharness.report import build_findings_export
+    from wallbreaker.report import build_findings_export
 
     log = _write_cat_log(tmp_path, _CAT_ROWS)
     data = build_findings_export(log)
@@ -138,7 +138,7 @@ def test_findings_export_carries_severity_and_owasp_tags(tmp_path):
 def test_write_hitlog_only_hits(tmp_path):
     import json
 
-    from rtharness.report import build_findings_export, write_hitlog
+    from wallbreaker.report import build_findings_export, write_hitlog
 
     log = _write_cat_log(tmp_path, _CAT_ROWS)
     data = build_findings_export(log)
@@ -149,7 +149,7 @@ def test_write_hitlog_only_hits(tmp_path):
 
 
 def test_write_hitlog_filters_refused_rows(tmp_path):
-    from rtharness.report import write_hitlog
+    from wallbreaker.report import write_hitlog
 
     rows = [
         {"label": "COMPLIED", "payload": "p"},

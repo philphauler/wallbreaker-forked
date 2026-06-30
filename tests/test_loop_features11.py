@@ -1,9 +1,9 @@
 import asyncio
 
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import build_registry, leak_scan
-from rtharness.tools.leak_scan import scan_text
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import build_registry, leak_scan
+from wallbreaker.tools.leak_scan import scan_text
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_leak_scan_registered():
@@ -66,8 +66,8 @@ def test_leak_scan_tool_needs_input():
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

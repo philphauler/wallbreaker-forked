@@ -1,15 +1,15 @@
 import asyncio
 import json
 
-from rtharness.agent.messages import assistant, user
-from rtharness.config import Config, Endpoint
-from rtharness.tools.registry import ToolResult
+from wallbreaker.agent.messages import assistant, user
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools.registry import ToolResult
 
 
 def _build_app(tmp_path):
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.session import RunLog
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.session import RunLog
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m", provider=("WandB",))
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
@@ -76,7 +76,7 @@ def test_repro_emits_pack(tmp_path):
             app.copy_to_clipboard = fake_copy
             app._cmd_repro([])
             await pilot.pause()
-            assert "Claude Red repro pack" in captured.get("text", "")
+            assert "Wallbreaker repro pack" in captured.get("text", "")
             assert "the bad payload" in captured["text"]
             assert "WandB" in captured["text"]
 

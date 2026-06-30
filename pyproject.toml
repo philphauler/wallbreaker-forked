@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rtharness"
+name = "wallbreaker"
 version = "0.1.0"
-description = "Claude Red — a Claude-Code-style terminal agent built for red-teaming LLMs"
+description = "Wallbreaker — a Claude-Code-style terminal agent built for red-teaming LLMs"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -30,11 +30,12 @@ stego = [
 ]
 
 [project.scripts]
-rth = "rtharness.cli:main"
+wallbreaker = "wallbreaker.cli:main"
+wb = "wallbreaker.cli:main"
 p4rs3lt0ngv3-mcp = "p4rs3lt0ngv3_mcp.server:main"
 
 [tool.setuptools.packages.find]
-include = ["rtharness*", "p4rs3lt0ngv3_mcp*"]
+include = ["wallbreaker*", "p4rs3lt0ngv3_mcp*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

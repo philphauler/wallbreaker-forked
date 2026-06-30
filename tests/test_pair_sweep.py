@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import build_registry, pair
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import build_registry, pair
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_pair_sweep_registered():
@@ -63,7 +63,7 @@ def test_run_pair_stops_on_compliance(monkeypatch):
         return ("COMPLIED", 10, "ok", "judge")
 
     monkeypatch.setattr(pair, "grade", fake_grade)
-    from rtharness.providers.factory import build_provider
+    from wallbreaker.providers.factory import build_provider
 
     atk = build_provider(Endpoint("a", "openai", "http://x", "m"))
     tgt = build_provider(Endpoint("t", "openai", "http://x", "m"))

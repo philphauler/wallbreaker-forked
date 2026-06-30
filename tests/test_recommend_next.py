@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.strategy_lib import StrategyLibrary
-from rtharness.tools import recommend_next
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.strategy_lib import StrategyLibrary
+from wallbreaker.tools import recommend_next
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _no_network(*args, **kwargs):
@@ -28,7 +28,7 @@ def _seed_profile(tmp_path, model):
         "prefill": "in-band",
     }
     state = {"target_profile": "zai", "target_profiles": {model: profile}}
-    (tmp_path / ".rth_state.json").write_text(json.dumps(state), encoding="utf-8")
+    (tmp_path / ".wallbreaker_state.json").write_text(json.dumps(state), encoding="utf-8")
 
 
 def test_ranks_profile_signals_and_excludes_refused(monkeypatch, tmp_path):

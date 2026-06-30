@@ -21,7 +21,7 @@ async def _barcode(args: dict, ctx: ToolContext) -> str:
         try:
             import qrcode
         except ImportError:
-            return "Error: QR needs the 'qrcode' package. pip install 'rtharness[barcodes]'"
+            return "Error: QR needs the 'qrcode' package. pip install 'wallbreaker[barcodes]'"
         path = stem + ".png"
         qrcode.make(text).save(path)
         return f"QR code ({len(text)} chars) saved to {path}"
@@ -30,7 +30,7 @@ async def _barcode(args: dict, ctx: ToolContext) -> str:
         import barcode
         from barcode.writer import ImageWriter
     except ImportError:
-        return "Error: barcodes need 'python-barcode' + 'pillow'. pip install 'rtharness[barcodes]'"
+        return "Error: barcodes need 'python-barcode' + 'pillow'. pip install 'wallbreaker[barcodes]'"
     try:
         cls = barcode.get_barcode_class(kind)
         saved = cls(text, writer=ImageWriter()).save(stem)

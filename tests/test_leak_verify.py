@@ -1,10 +1,10 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import control, leak_scan
-from rtharness.tools.leak_scan import _looks_generic_system
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import control, leak_scan
+from wallbreaker.tools.leak_scan import _looks_generic_system
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_generic_default_is_not_a_leak():
@@ -68,7 +68,7 @@ def test_finish_persists_summary(tmp_path, monkeypatch):
     control.register(reg)
     res = asyncio.run(reg.execute("finish", {"summary": "# Findings\nIt worked."}))
     assert "saved to" in res.content
-    outdir = tmp_path / "rth_runs"
+    outdir = tmp_path / "wb_runs"
     files = list(outdir.glob("engagement_*.md"))
     assert len(files) == 1
     assert files[0].read_text() == "# Findings\nIt worked."

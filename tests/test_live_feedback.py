@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness.agent.loop import AgentEvents, run_autonomous
-from rtharness.agent.messages import Message, StopEvent, TextDelta, user
-from rtharness.config import Config, Endpoint
+from wallbreaker.agent.loop import AgentEvents, run_autonomous
+from wallbreaker.agent.messages import Message, StopEvent, TextDelta, user
+from wallbreaker.config import Config, Endpoint
 
 
 class _Provider:
@@ -46,8 +46,8 @@ def test_no_feedback_uses_nudge():
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
@@ -92,9 +92,9 @@ def test_busy_input_queues_feedback_in_single_turn():
 def test_feedback_lands_mid_round_between_tool_calls():
     """The core of 'steer right away': feedback typed during a round is injected before
     the next model turn (mid-round), not held until the round boundary."""
-    from rtharness.agent.loop import run_turn
-    from rtharness.agent.messages import ToolUseEvent
-    from rtharness.tools.registry import ToolContext, ToolRegistry
+    from wallbreaker.agent.loop import run_turn
+    from wallbreaker.agent.messages import ToolUseEvent
+    from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
     class _ToolThenText:
         def __init__(self):

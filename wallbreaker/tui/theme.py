@@ -3,7 +3,7 @@ from __future__ import annotations
 from textual.theme import Theme
 
 RTH_THEME = Theme(
-    name="claude-red",
+    name="wallbreaker",
     primary="#E5484D",
     secondary="#C77DFF",
     accent="#FF7A85",

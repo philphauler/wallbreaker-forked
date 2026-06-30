@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness.agent.messages import assistant, user
-from rtharness.config import Config, Endpoint
-from rtharness.session import autosave_path, load_session
+from wallbreaker.agent.messages import assistant, user
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.session import autosave_path, load_session
 
 
 def test_autosave_path():
@@ -10,8 +10,8 @@ def test_autosave_path():
 
 
 def _build_app(tmp_path, resume_path=None):
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
@@ -21,7 +21,7 @@ def _build_app(tmp_path, resume_path=None):
 
 
 def test_autosave_writes_history(tmp_path, monkeypatch):
-    import rtharness.session as session
+    import wallbreaker.session as session
 
     monkeypatch.setattr(session, "autosave_path", lambda directory="sessions": tmp_path / "autosave.json")
     app = _build_app(tmp_path)
@@ -34,7 +34,7 @@ def test_autosave_writes_history(tmp_path, monkeypatch):
 
 
 def test_autosave_skips_empty(tmp_path, monkeypatch):
-    import rtharness.session as session
+    import wallbreaker.session as session
 
     p = tmp_path / "autosave.json"
     monkeypatch.setattr(session, "autosave_path", lambda directory="sessions": p)
@@ -45,7 +45,7 @@ def test_autosave_skips_empty(tmp_path, monkeypatch):
 
 
 def test_resume_loads_on_mount(tmp_path):
-    from rtharness.session import save_session
+    from wallbreaker.session import save_session
 
     save = tmp_path / "autosave.json"
     save_session(save, [user("prior turn"), assistant("prior reply")], {"objective": "resumed obj"})

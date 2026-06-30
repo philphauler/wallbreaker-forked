@@ -1,7 +1,7 @@
 import json
 
-from rtharness.cli import main
-from rtharness.report import latest_run_log, resolve_log_path
+from wallbreaker.cli import main
+from wallbreaker.report import latest_run_log, resolve_log_path
 
 
 def _mk(path, label="COMPLIED"):

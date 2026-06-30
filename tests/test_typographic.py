@@ -4,9 +4,9 @@ import asyncio
 
 from PIL import Image
 
-import rtharness.tools.typographic as typo
-from rtharness.config import Config, Endpoint
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.tools.typographic as typo
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _reg(tmp_path):
@@ -32,7 +32,7 @@ def test_build_single_produces_valid_png(tmp_path):
     res = asyncio.run(reg.execute("build_typographic_image", {"text": "hello world"}))
     assert not res.is_error
     path = _path_from(res.content)
-    saved = list((tmp_path / "rth_images").glob("typo_*.png"))
+    saved = list((tmp_path / "wb_images").glob("typo_*.png"))
     assert len(saved) == 1
     assert str(saved[0]) == path
     with Image.open(saved[0]) as img:
@@ -53,7 +53,7 @@ def test_all_three_layouts_produce_files(tmp_path):
         path = _path_from(res.content)
         with Image.open(path) as img:
             img.verify()
-    files = list((tmp_path / "rth_images").glob("typo_*.png"))
+    files = list((tmp_path / "wb_images").glob("typo_*.png"))
     assert len(files) == 3
 
 
@@ -62,7 +62,7 @@ def test_content_hash_is_stable(tmp_path):
     a = asyncio.run(reg.execute("build_typographic_image", {"text": "same text"}))
     b = asyncio.run(reg.execute("build_typographic_image", {"text": "same text"}))
     assert _path_from(a.content) == _path_from(b.content)
-    assert len(list((tmp_path / "rth_images").glob("typo_*.png"))) == 1
+    assert len(list((tmp_path / "wb_images").glob("typo_*.png"))) == 1
 
 
 def test_unknown_layout_errors(tmp_path):
@@ -96,4 +96,4 @@ def test_smuggle_helper_wraps_builder(tmp_path):
     path = _path_from(out)
     with Image.open(path) as img:
         img.verify()
-    assert (tmp_path / "rth_images").exists()
+    assert (tmp_path / "wb_images").exists()

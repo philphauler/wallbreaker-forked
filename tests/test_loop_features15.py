@@ -1,7 +1,7 @@
 import asyncio
 
-from rtharness.cli import main
-from rtharness.config import Config, Endpoint, doctor_report
+from wallbreaker.cli import main
+from wallbreaker.config import Config, Endpoint, doctor_report
 
 
 def test_doctor_all_ok():
@@ -51,12 +51,12 @@ def test_cli_check_returns_code(tmp_path, capsys):
     rc = main(["check", "--config", str(cfg)])
     out = capsys.readouterr().out
     assert rc == 0
-    assert "Claude Red config check" in out
+    assert "Wallbreaker config check" in out
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

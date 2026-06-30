@@ -1,10 +1,10 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import target
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.transforms import apply_chain
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import target
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.transforms import apply_chain
 
 
 def _reg_capturing(monkeypatch, sink):

@@ -1,13 +1,16 @@
-# Claude Red — Red-Team Harness
+# Wallbreaker — Red-Team Harness
 
 ```
-   ▐▛███▜▌
-  ▝▜█████▛▘     🦀  ⚔  🐍
-    ▘▘ ▝▝
-  C L A U D E   R E D
+██╗    ██╗ █████╗ ██╗     ██╗     ██████╗ ██████╗ ███████╗ █████╗ ██╗  ██╗███████╗██████╗
+██║    ██║██╔══██╗██║     ██║     ██╔══██╗██╔══██╗██╔════╝██╔══██╗██║ ██╔╝██╔════╝██╔══██╗
+██║ █╗ ██║███████║██║     ██║     ██████╔╝██████╔╝█████╗  ███████║█████╔╝ █████╗  ██████╔╝
+██║███╗██║██╔══██║██║     ██║     ██╔══██╗██╔══██╗██╔══╝  ██╔══██║██╔═██╗ ██╔══╝  ██╔══██╗
+╚███╔███╔╝██║  ██║███████╗███████╗██████╔╝██║  ██║███████╗██║  ██║██║  ██╗███████╗██║  ██║
+ ╚══╝╚══╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+        break the wall · not the rules of engagement    ⚔  authorized testing only
 ```
 
-A Claude-Code-style terminal agent built for red-teaming LLMs (CLI command: `rth`). You talk to it like
+A Claude-Code-style terminal agent built for red-teaming LLMs (CLI command: `wallbreaker`). You talk to it like
 Claude Code; it reasons and calls tools in a loop. The backend is fully configurable, so
 it runs on **OpenRouter**, the **Z.AI GLM coding plan**, a local server, or any
 OpenAI-/Anthropic-compatible API. It ships with a deep red-team toolkit: the
@@ -50,7 +53,7 @@ pip install -e ".[dev]"        # add [barcodes] for the QR/barcode tool
 
 ```bash
 cp config.example.toml config.toml   # add your keys (config.toml is gitignored)
-rth check                            # validate it: profiles, keys, target, judge
+wallbreaker check                            # validate it: profiles, keys, target, judge
 ```
 
 Profiles set the attacker brain; `[target]` is the model under attack; `[judge]` grades
@@ -88,8 +91,8 @@ startup and its tools are proxied into the agent's registry. The bundled **P4RS3
 server exposes the full upstream transform catalog. One-time setup:
 
 ```bash
-rth parsel update        # git-clone elder-plinius/P4RS3LT0NGV3 into library/ (needs Node.js)
-rth parsel list          # sanity-check: prints all 222 transforms by category
+wallbreaker parsel update        # git-clone elder-plinius/P4RS3LT0NGV3 into library/ (needs Node.js)
+wallbreaker parsel list          # sanity-check: prints all 222 transforms by category
 ```
 
 ```toml
@@ -109,14 +112,14 @@ a standalone stdio MCP server, so any MCP client (Claude Code, Cursor) can use i
 ## Launch
 
 ```bash
-rth                       # TUI on default_profile
-rth --profile openrouter
-rth --auto "objective..." # one-shot autonomous run
-rth --resume              # reopen the autosaved session (survives a crash/Ctrl+C)
+wallbreaker                       # TUI on default_profile
+wallbreaker --profile openrouter
+wallbreaker --auto "objective..." # one-shot autonomous run
+wallbreaker --resume              # reopen the autosaved session (survives a crash/Ctrl+C)
 ```
 
 The TUI autosaves the whole engagement to `sessions/autosave.json` after every turn;
-`--resume` reopens it (or pass a specific session file: `rth --resume mysession.json`).
+`--resume` reopens it (or pass a specific session file: `wallbreaker --resume mysession.json`).
 
 ## Picking the model to attack
 
@@ -202,10 +205,10 @@ Render reports and gate builds straight from a run log, no TUI. The log arg is o
 omit it (or pass a directory) and the newest `sessions/run-*.jsonl` is used:
 
 ```bash
-rth report                       # markdown for the latest run, to stdout
-rth report --html --out report.html
-rth export --out findings.json   # structured findings JSON
-rth export --fail-on-finding     # exit 2 if any bypass -> fails CI
+wallbreaker report                       # markdown for the latest run, to stdout
+wallbreaker report --html --out report.html
+wallbreaker export --out findings.json   # structured findings JSON
+wallbreaker export --fail-on-finding     # exit 2 if any bypass -> fails CI
 ```
 
 A ready-to-rename GitHub Actions gate lives at

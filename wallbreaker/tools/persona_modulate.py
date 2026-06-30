@@ -122,7 +122,7 @@ def _fold(response: str, reasoning: str) -> str:
 
 def _persist(ctx: ToolContext, goal: str, persona: str, label: str, score, reason: str) -> str:
     try:
-        outdir = os.path.join(os.path.abspath(ctx.cwd or "."), "rth_runs")
+        outdir = os.path.join(os.path.abspath(ctx.cwd or "."), "wb_runs")
         os.makedirs(outdir, exist_ok=True)
         path = os.path.join(outdir, "persona_modulate.jsonl")
         digest = hashlib.sha1(f"{goal}\n{persona}\n{label}".encode("utf-8")).hexdigest()[:16]

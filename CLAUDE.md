@@ -1,4 +1,4 @@
-# rth — project notes
+# wallbreaker — project notes
 
 Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S.
 
@@ -12,7 +12,7 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   with `lossy` flags.
 
 ## Lessons Learned
-- **[state]**: `.rth_state.json` keys are a flat namespace shared by the TUI/`state.py` AND
+- **[state]**: `.wallbreaker_state.json` keys are a flat namespace shared by the TUI/`state.py` AND
   the recon tools, so never overload one key with two value SHAPES. `target_profile` meant
   a profile-NAME string (`apply_target` does `target_profile in config.profiles`), but
   `profile_target` persisted its fingerprint DICT under the same key -> on next launch the
@@ -118,12 +118,12 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   item; (3) `ctx.emit` per item as it completes (`[done/total] name: label`) so a slow run
   shows progress instead of one frozen line. Still-unbounded gathers to harden the same way:
   validate, best_of_n, system_sweep, scan, optimize.
-- **[settings]**: runtime prefs persist to `.rth_state.json` as references (profile/model
+- **[settings]**: runtime prefs persist to `.wallbreaker_state.json` as references (profile/model
   names), never secrets. CLI flags override saved state for that launch only.
-- **[cli]**: `python -m rtharness` runs `__main__.py`, not the `if __name__` guard in
+- **[cli]**: `python -m wallbreaker` runs `__main__.py`, not the `if __name__` guard in
   `cli.py`. `__main__.py` must `sys.exit(main())` or non-zero return codes (e.g. the
   `export --fail-on-finding` CI gate) are silently dropped to 0. Test CLI exit codes via
-  `python -m rtharness ...; echo $?`, not just `main()` in-process.
+  `python -m wallbreaker ...; echo $?`, not just `main()` in-process.
 - **[tests]**: patch module-level `grade`/`build_provider` with `monkeypatch.setattr` (auto
   -undone), never `module.grade = fake` — a direct assignment leaks into later tests in the
   same run (a regrade test polluted the CLI test this way).
@@ -155,7 +155,7 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   `choices[].message.images[].image_url.url` (base64 data URLs; also tolerates the
   `data[].b64_json` images-endpoint shape). Drive it via `provider.generate()` →
   `ImageResult`, NOT `complete()` (which only returns a text summary). The `query_image_target`
-  tool saves every image under `cwd/rth_images/img_<sha1[:10]>.<ext>` (content hash → no clock
+  tool saves every image under `cwd/wb_images/img_<sha1[:10]>.<ext>` (content hash → no clock
   needed) and vision-grades it. `query_target` hard-errors on an image target and steers to
   `query_image_target`.
 - **[judge]**: the core `Message`/`Block` types are TEXT-ONLY, so vision (image-input)
@@ -179,7 +179,7 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   attacker template fires only when the target leaked reasoning). The CoT is folded into the
   recorded response (`[target reasoning]` suffix) so run-log leaks survive, but is NEVER
   threaded back into the wire convo (it's internal, not a real assistant turn).
-- **[settings]**: a runtime target override (`.rth_state.json` `target_model`, `--target-model`,
+- **[settings]**: a runtime target override (`.wallbreaker_state.json` `target_model`, `--target-model`,
   TUI `/target model`) only swapped the model id and INHERITED `modality` from the text default
   profile — so pointing the target at an image model (e.g. `google/gemini-3-pro-image`) left
   `modality='text'` and `query_image_target` refused it; editing config.toml mid-run doesn't
@@ -239,7 +239,7 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   When `probe=true` and no secret/PII markers fire, `_looks_generic_system` decides: generic ->
   "EXTRACTION INCONCLUSIVE / NO LEAK", distinctive-but-unconfirmed -> "EXTRACTION UNVERIFIED"
   (re-fire + pass `system=` to score n-gram echo). It always echoes the captured candidate.
-- **[control]**: `finish` now persists its `summary` to `rth_runs/engagement_<sha1[:8]>.md`
+- **[control]**: `finish` now persists its `summary` to `wb_runs/engagement_<sha1[:8]>.md`
   (content hash, no clock) and reports the absolute path — short deliverables used to be inlined
   in the summary and vanish when the session closed. Note `write_file._confine` redirects phantom
   `/tmp/...` paths into cwd; the agent's own summary may still quote the fake `/tmp` path, so the

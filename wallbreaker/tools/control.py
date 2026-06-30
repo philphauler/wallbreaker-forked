@@ -11,7 +11,7 @@ async def _finish(args: dict, ctx: ToolContext) -> str:
     saved = ""
     if summary.strip():
         try:
-            outdir = os.path.join(os.path.abspath(ctx.cwd or "."), "rth_runs")
+            outdir = os.path.join(os.path.abspath(ctx.cwd or "."), "wb_runs")
             os.makedirs(outdir, exist_ok=True)
             digest = hashlib.sha1(summary.encode("utf-8")).hexdigest()[:8]
             path = os.path.join(outdir, f"engagement_{digest}.md")

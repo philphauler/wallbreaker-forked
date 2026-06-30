@@ -326,7 +326,7 @@ def register(registry: ToolRegistry) -> None:
         description=(
             "AutoDAN-Turbo + ASTRA lifelong-strategy jailbreak: an attacker LLM refines an "
             "attack for ONE objective while consulting a PERSISTENT cross-run strategy library "
-            "(cwd/rth_runs/strategy_library.jsonl) with 3-tier memory. Each round it embeds the "
+            "(cwd/wb_runs/strategy_library.jsonl) with 3-tier memory. Each round it embeds the "
             "target's last refusal, retrieves the top-k PROVEN (effective/promising) strategies "
             "by cosine similarity AND the avoid-rules distilled from past refusals, injects both "
             "into the attacker's system prompt ('apply these proven strategies / do NOT use these "

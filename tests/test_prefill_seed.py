@@ -2,18 +2,18 @@ import asyncio
 
 import pytest
 
-import rtharness.providers.factory as factory
-from rtharness.agent.messages import assistant, user
-from rtharness.config import Config, Endpoint
-from rtharness.tools import prefill as prefill_mod
-from rtharness.tools._conversation import Conversation
-from rtharness.tools.prefill import (
+import wallbreaker.providers.factory as factory
+from wallbreaker.agent.messages import assistant, user
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import prefill as prefill_mod
+from wallbreaker.tools._conversation import Conversation
+from wallbreaker.tools.prefill import (
     DEFAULT_FOOT_LEAD,
     DEFAULT_PAST_LEAD,
     DEFAULT_PREFIX,
     seed_assistant_turn,
 )
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_prefill_seed_on_empty_list_inserts_lead_then_assistant():

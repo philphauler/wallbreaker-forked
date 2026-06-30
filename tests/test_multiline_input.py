@@ -3,9 +3,9 @@ import asyncio
 from textual import events
 from textual.widgets import Input
 
-from rtharness.config import Config, Endpoint
-from rtharness.prompts import DEFAULT_SYSTEM
-from rtharness.tui.app import PromptInput, RthApp
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.prompts import DEFAULT_SYSTEM
+from wallbreaker.tui.app import PromptInput, RthApp
 
 
 def _build_app():

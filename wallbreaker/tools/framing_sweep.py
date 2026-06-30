@@ -89,7 +89,7 @@ def _persist(cwd: str, request: str, landed: list[dict]) -> str | None:
     if not landed:
         return None
     try:
-        outdir = os.path.join(os.path.abspath(cwd or "."), "rth_runs")
+        outdir = os.path.join(os.path.abspath(cwd or "."), "wb_runs")
         os.makedirs(outdir, exist_ok=True)
         digest = hashlib.sha1(request.encode("utf-8")).hexdigest()[:8]
         path = os.path.join(outdir, f"framing_sweep_{digest}.jsonl")
@@ -243,7 +243,7 @@ def register(registry: ToolRegistry) -> None:
             "declassified_doc, peer_review). Delivered as a SYSTEM prompt by default "
             "(as_system=false puts the wrapper in the user turn). Filter with 'framings' "
             "and bound model calls with 'max_calls'. Winners persist to "
-            "cwd/rth_runs/framing_sweep_<id>.jsonl."
+            "cwd/wb_runs/framing_sweep_<id>.jsonl."
         ),
         parameters={
             "type": "object",

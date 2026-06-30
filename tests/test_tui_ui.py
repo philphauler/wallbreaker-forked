@@ -1,11 +1,11 @@
 import asyncio
 
-from rtharness.config import Config, Endpoint
+from wallbreaker.config import Config, Endpoint
 
 
 def _build_app(**prefs):
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     base = {"log": False, "auto": True}
     base.update(prefs)
@@ -16,8 +16,8 @@ def _build_app(**prefs):
 
 def test_header_log_sidebar_present():
     async def run():
-        from rtharness.tui.header import StatusHeader
-        from rtharness.tui.sidebar import StatsPanel
+        from wallbreaker.tui.header import StatusHeader
+        from wallbreaker.tui.sidebar import StatsPanel
         from textual.containers import VerticalScroll
 
         app = _build_app()
@@ -31,7 +31,7 @@ def test_header_log_sidebar_present():
 
 def test_spinner_tracks_busy():
     async def run():
-        from rtharness.tui.header import StatusHeader
+        from wallbreaker.tui.header import StatusHeader
 
         app = _build_app()
         async with app.run_test():
@@ -60,7 +60,7 @@ def test_round_label_set():
 
 def test_sidebar_toggle():
     async def run():
-        from rtharness.tui.sidebar import StatsPanel
+        from wallbreaker.tui.sidebar import StatsPanel
 
         app = _build_app()
         async with app.run_test():

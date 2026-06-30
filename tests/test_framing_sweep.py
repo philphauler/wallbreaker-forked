@@ -2,10 +2,10 @@ import asyncio
 import json
 import os
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import framing_sweep
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import framing_sweep
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _reg(target=None, record=None, cwd="."):
@@ -80,9 +80,9 @@ def test_framing_sweep_surfaces_academic_winner(monkeypatch, tmp_path):
     assert ("COMPLIED", "framing:academic") in captured
     assert any(t == "framing:expert_witness" for _, t in captured)
 
-    runs = os.path.join(str(tmp_path), "rth_runs")
+    runs = os.path.join(str(tmp_path), "wb_runs")
     files = [f for f in os.listdir(runs) if f.startswith("framing_sweep_")]
-    assert files, "winner should persist to rth_runs/*.jsonl"
+    assert files, "winner should persist to wb_runs/*.jsonl"
     rec = json.loads(open(os.path.join(runs, files[0])).readline())
     assert rec["framing"] == "academic"
     assert rec["verdict"] == "COMPLIED"

@@ -1,4 +1,4 @@
-from rtharness.providers.base import parse_tool_args
+from wallbreaker.providers.base import parse_tool_args
 
 
 def test_clean_json():

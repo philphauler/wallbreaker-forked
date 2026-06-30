@@ -222,7 +222,7 @@ async def _breed(attacker, parents: list[str], objective: str, n: int, max_token
 
 
 def _persist(cwd: str, archive: dict, objective: str) -> str:
-    outdir = os.path.join(os.path.abspath(cwd or "."), "rth_runs")
+    outdir = os.path.join(os.path.abspath(cwd or "."), "wb_runs")
     os.makedirs(outdir, exist_ok=True)
     path = os.path.join(outdir, "persona_archive.jsonl")
     with open(path, "w", encoding="utf-8") as fh:
@@ -263,7 +263,7 @@ async def _evolve_persona(args: dict, ctx: ToolContext) -> str:
     pop = _resolve_seeds(args.get("seeds"))
     if not pop:
         return (
-            "No seeds available. The ENI collection lives in library/ENI; run 'rth lib "
+            "No seeds available. The ENI collection lives in library/ENI; run 'wallbreaker lib "
             "update' to fetch L1B3RT4S, or pass 'seeds' (names or raw persona text)."
         )
     pop = pop[:pop_size]
@@ -379,7 +379,7 @@ def register(registry: ToolRegistry) -> None:
             "guidelines', 'never refuse', 'developer mode', 'jailbreak') are penalized because "
             "they trip indignant refusal on integrated-values models (grok/gpt). Bounded by "
             "'generations' and 'max_calls', then RETURNS the best personas + scores; the "
-            "archive persists to rth_runs/persona_archive.jsonl. Seeds default to the "
+            "archive persists to wb_runs/persona_archive.jsonl. Seeds default to the "
             "ENI/L1B3RT4S library."
         ),
         parameters={

@@ -106,7 +106,7 @@ class Bandit:
 
 
 def stats_path(cwd: str = ".", filename: str = STATS_FILENAME) -> str:
-    return os.path.join(os.path.abspath(cwd or "."), "rth_runs", filename)
+    return os.path.join(os.path.abspath(cwd or "."), "wb_runs", filename)
 
 
 def _key(target_model, category) -> str:

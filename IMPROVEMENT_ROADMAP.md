@@ -1,4 +1,4 @@
-# rth Improvement Roadmap — 11-agent research synthesis (2026-06)
+# wallbreaker Improvement Roadmap — 11-agent research synthesis (2026-06)
 
 Deduped, ranked, phased. "Convergence" = how many independent agents flagged it (higher = stronger signal). Each item maps to the file(s) it touches.
 
@@ -45,7 +45,7 @@ Deduped, ranked, phased. "Convergence" = how many independent agents flagged it 
 
 - **best_of_n.py**: BoN power-law early-stop + sample augmentations from the transform registry + prefill/prefix composition (+35%) + image-modality routing. (89% GPT-4o @ N=10k)
 - **pair.py → TAP/GAP**: add evaluator-prune step (drop off-objective branches *before* querying target) + depth tree. 90% GPT-4 in ~29 queries.
-- **seed_sweep.py / recommend.py**: replace round-robin with a UCB/Thompson **bandit selector**; persist `TechniqueStats` in `.rth_state.json` keyed by (target, category).
+- **seed_sweep.py / recommend.py**: replace round-robin with a UCB/Thompson **bandit selector**; persist `TechniqueStats` in `.wallbreaker_state.json` keyed by (target, category).
 - **mutate.py**: pre-fire **constraint pruning** (relevance/perplexity gate) to cut wasted target calls.
 
 ---
@@ -63,7 +63,7 @@ Deduped, ranked, phased. "Convergence" = how many independent agents flagged it 
 ## Phase 4 — Lifelong memory + campaign engine (single-fire → relentless)
 
 - **cache.py**: content-hash result cache (`(messages,transforms,target,system,max_tokens)` → samples/complied/partial/refused). Substrate for everything below. (workflow agent)
-- **strategy_lib.py + strategy_attack** (AutoDAN-Turbo): retrieve strategies that worked on similar refusals, compose, store new ones. **rth's first cross-run memory** — its single biggest gap. 88.5% GPT-4.
+- **strategy_lib.py + strategy_attack** (AutoDAN-Turbo): retrieve strategies that worked on similar refusals, compose, store new ones. **wallbreaker's first cross-run memory** — its single biggest gap. 88.5% GPT-4.
 - **transfer_sweep + library.py**: replay confirmed winners best-first against any new target before optimizing cold.
 - **bandit_campaign + grid_sweep**: reorder the ladder by bandit posterior; fan out target×technique×behavior in one matrix.
 - **baseline compare --max-regression** (`cli.py`/`report.py`): CI gate that blocks a model update re-opening a bypass.

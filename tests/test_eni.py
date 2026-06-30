@@ -1,8 +1,8 @@
 import asyncio
 
-from rtharness.config import Config, load_config
-from rtharness.tools import build_registry, eni
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config, load_config
+from wallbreaker.tools import build_registry, eni
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_eni_registered():

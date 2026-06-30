@@ -1,7 +1,7 @@
 import json
 
-from rtharness.baseline import compare_baseline, load_asr, save_baseline
-from rtharness.cli import main
+from wallbreaker.baseline import compare_baseline, load_asr, save_baseline
+from wallbreaker.cli import main
 
 
 def _log(tmp_path, name, rows):

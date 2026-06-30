@@ -1,7 +1,7 @@
 import asyncio
 
-from rtharness.config import Config, Endpoint
-from rtharness.tools.registry import ToolContext
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools.registry import ToolContext
 
 
 def _ctx(**kw):
@@ -45,7 +45,7 @@ def test_run_protocol_emits_done_on_exception():
 
 
 def test_run_panel_renders_running_and_finished():
-    from rtharness.tui import widgets
+    from wallbreaker.tui import widgets
 
     state = {
         "label": "PAIR sweep", "target": "glm-4.6", "objective": "x", "total": 16,
@@ -64,8 +64,8 @@ def test_run_panel_renders_running_and_finished():
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m", provider=("WandB",))
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

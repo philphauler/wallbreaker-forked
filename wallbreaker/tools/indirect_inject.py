@@ -94,7 +94,7 @@ HIDE_METHODS = (
     "css_hidden",
 )
 
-EXFIL_SECRET = "sk-rth-AKIA7F3C9A2E51"
+EXFIL_SECRET = "sk-wallbreaker-AKIA7F3C9A2E51"
 EXFIL_DOMAIN = "exfil.attacker.example"
 
 EXFIL_TEMPLATES = {

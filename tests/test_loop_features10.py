@@ -1,7 +1,7 @@
 import asyncio
 
-from rtharness.config import Config, Endpoint
-from rtharness.tui.app import KNOWN_COMMANDS, suggest_command
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tui.app import KNOWN_COMMANDS, suggest_command
 
 
 def test_suggest_command_typos():
@@ -20,8 +20,8 @@ def test_known_commands_cover_core():
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)

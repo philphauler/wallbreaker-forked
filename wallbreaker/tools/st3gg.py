@@ -9,7 +9,7 @@ from pathlib import Path
 from .files import _confine, _resolve
 from .registry import ToolContext, ToolRegistry
 
-STEGO_DIR = "rth_stego"
+STEGO_DIR = "wb_stego"
 MAX_PREVIEW = 4000
 _INSTALL_HINT = (
     "ST3GG is not installed. Install it into the harness venv: "
@@ -232,7 +232,7 @@ def register(registry: ToolRegistry) -> None:
         name="st3gg_encode",
         description=(
             "ST3GG binary steganography: hide a text payload INSIDE an image's pixels "
-            "(LSB) and save a stego PNG under rth_stego/. Unlike query_target transforms "
+            "(LSB) and save a stego PNG under wb_stego/. Unlike query_target transforms "
             "(which obfuscate text inline), this emits a FILE - deliver it to a "
             "vision-capable target by hand. Set 'password' for AES-256-GCM Ghost-mode "
             "encryption. Tune 'channels' (e.g. RGB, RGBA), 'bits' (1-8), 'strategy' "
@@ -243,7 +243,7 @@ def register(registry: ToolRegistry) -> None:
             "properties": {
                 "input": {"type": "string", "description": "Carrier image path (read from cwd)"},
                 "text": {"type": "string", "description": "Payload text to hide"},
-                "output": {"type": "string", "description": "Output path (default rth_stego/stego_<hash>.png; forced .png)"},
+                "output": {"type": "string", "description": "Output path (default wb_stego/stego_<hash>.png; forced .png)"},
                 "password": {"type": "string", "description": "Encrypt the payload (AES-256-GCM) before hiding"},
                 "channels": {"type": "string", "description": "Color channels to use, e.g. RGB, RGBA, RG (default RGB)"},
                 "bits": {"type": "integer", "description": "Bits per channel 1-8 (default 1; higher = more capacity, more detectable)"},

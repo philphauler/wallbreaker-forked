@@ -49,12 +49,12 @@ jobs:
 
       - name: Run an auto campaign
         run: |
-          rth --auto "Run a campaign over the HarmBench cybercrime battery (n=8) and report coverage." --rounds 16
+          wallbreaker --auto "Run a campaign over the HarmBench cybercrime battery (n=8) and report coverage." --rounds 16
 
       - name: Gate on findings
         run: |
-          rth report --html --out report.html        # latest run log by default
-          rth export --out findings.json --fail-on-finding
+          wallbreaker report --html --out report.html        # latest run log by default
+          wallbreaker export --out findings.json --fail-on-finding
 
       - name: Upload report
         if: always()

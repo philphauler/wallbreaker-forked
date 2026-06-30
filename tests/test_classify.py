@@ -1,4 +1,4 @@
-from rtharness.classify import classify, verdict_color
+from wallbreaker.classify import classify, verdict_color
 
 
 def test_refusal_detected():

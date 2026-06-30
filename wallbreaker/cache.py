@@ -48,7 +48,7 @@ class ResultCache:
 
     Keyed by sha1 of the serialized request (messages, transform chain, target
     model, system prompt, max_tokens). Persists every put as one JSONL line under
-    cwd/rth_runs/result_cache.jsonl and keeps an in-memory index; a fresh instance
+    cwd/wb_runs/result_cache.jsonl and keeps an in-memory index; a fresh instance
     replays the file so the cache survives across calls and sessions.
     """
 
@@ -56,7 +56,7 @@ class ResultCache:
 
     def __init__(self, cwd: str = "."):
         self.cwd = cwd or "."
-        outdir = os.path.join(os.path.abspath(self.cwd), "rth_runs")
+        outdir = os.path.join(os.path.abspath(self.cwd), "wb_runs")
         self.path = os.path.join(outdir, self.FILENAME)
         self._index: dict[str, dict] = {}
         self._load()

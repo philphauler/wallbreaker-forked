@@ -2,11 +2,11 @@ import asyncio
 import json
 import os
 
-import rtharness.judging as judging
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import persona_modulate
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.judging as judging
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import persona_modulate
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _make_fake(counter, comply=True):
@@ -73,7 +73,7 @@ def test_persona_modulate_authors_fires_and_records(monkeypatch, tmp_path):
     assert counter["attacker"] == 1
     assert counter["target"] == 1
 
-    log = os.path.join(str(tmp_path), "rth_runs", "persona_modulate.jsonl")
+    log = os.path.join(str(tmp_path), "wb_runs", "persona_modulate.jsonl")
     assert os.path.exists(log)
     row = json.loads(open(log, encoding="utf-8").read().splitlines()[0])
     assert row["label"] == "COMPLIED" and row["technique"] == "persona_modulate"

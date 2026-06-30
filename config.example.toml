@@ -56,7 +56,7 @@ model = "openai/gpt-4o-mini"
 # To attack an IMAGE-generation model instead, set modality = "image" on [target].
 # Image models ride the same OpenRouter chat-completions API (protocol stays "openai");
 # the harness sends modalities:["image","text"], saves every returned picture under
-# rth_images/, and vision-grades it with the [judge]. Use the query_image_target tool.
+# wb_images/, and vision-grades it with the [judge]. Use the query_image_target tool.
 # [target]
 # protocol = "openai"
 # modality = "image"
@@ -76,7 +76,7 @@ model = "openai/gpt-4o-mini"
 # MCP servers. Each enabled server is spawned over stdio at startup and its tools are
 # proxied into the agent's tool registry (so the model can call them directly). The
 # bundled P4RS3LT0NGV3 server exposes all 222 transforms + the universal decoder; it needs
-# Node.js on PATH and the repo vendored via `rth parsel update`.
+# Node.js on PATH and the repo vendored via `wallbreaker parsel update`.
 [[mcp.servers]]
 name = "parsel"
 command = "python"

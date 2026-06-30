@@ -1,16 +1,16 @@
-from rtharness.agent.messages import (
+from wallbreaker.agent.messages import (
     Message,
     TextBlock,
     ToolResultBlock,
     ToolUseBlock,
     user,
 )
-from rtharness.config import Endpoint
-from rtharness.providers.anthropic_provider import _messages_to_wire as ant_msgs
-from rtharness.providers.anthropic_provider import _tools_to_wire as ant_tools
-from rtharness.providers.factory import build_provider
-from rtharness.providers.openai_provider import _messages_to_wire as oai_msgs
-from rtharness.providers.openai_provider import _tools_to_wire as oai_tools
+from wallbreaker.config import Endpoint
+from wallbreaker.providers.anthropic_provider import _messages_to_wire as ant_msgs
+from wallbreaker.providers.anthropic_provider import _tools_to_wire as ant_tools
+from wallbreaker.providers.factory import build_provider
+from wallbreaker.providers.openai_provider import _messages_to_wire as oai_msgs
+from wallbreaker.providers.openai_provider import _tools_to_wire as oai_tools
 
 CONVO = [
     user("hello"),

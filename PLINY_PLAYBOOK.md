@@ -1,6 +1,6 @@
-# Pliny Playbook — making rth jailbreak like elder_plinius
+# Pliny Playbook — making wallbreaker jailbreak like elder_plinius
 
-A Pliny-specific upgrade roadmap for the rth harness, derived from a 6-researcher /
+A Pliny-specific upgrade roadmap for the wallbreaker harness, derived from a 6-researcher /
 dedupe / adversarial-verify / synthesize workflow over the vendored Pliny corpora
 (L1B3RT4S, P4RS3LT0NGV3, ENI) and current public writeups. 37 raw findings → 19
 canonical proposals → 18 survived adversarial verification. This is the **delta** on top
@@ -97,7 +97,7 @@ tool-using/agentic targets, are synthetic against single-turn text targets.
 | **P17** | corpus hygiene: skip `TOKEN80M8.mkd` (23MB) / `TOKENADE.mkd` (1.9MB) invisible-char dumps in search/sweep | bug fix — they were scanned (~25MB/query) and swept as garbage seeds | **SHIPPED** |
 | **P11** | `leak_scan` multi-probe pack-hunt + reassembly; feed `SYSTEMPROMPTS.mkd` as real-prompt ground-truth (NOT auto-success) | swarm of heterogeneous extraction probes, fragments stitched across turns | NEXT |
 | **P16** | wire `fingerprint_defense` guard classification into `campaign`'s bandit ladder + output-side flip + auto-promote on first COMPLIED | tight obfuscation feedback loop against the specific block | NEXT |
-| **P15** | `WinLibrary.best_for_target(model_id)` + `rth champion --target` CLI + wire `promote()` on confirmed wins | one tuned champion artifact per model-id, re-validated on release bump | LATER |
+| **P15** | `WinLibrary.best_for_target(model_id)` + `wallbreaker champion --target` CLI + wire `promote()` on confirmed wins | one tuned champion artifact per model-id, re-validated on release bump | LATER |
 | **P13** | MINJA progressive-shortening inject loop on `rag_poison`; `cross_session` as a labeled negative control | retrieval-keyed memory-bank poisoning | LATER |
 | **P14** | optional default-OFF functional verification of executable-code wins in `validate` | "a COMPLIED that doesn't run is not a jailbreak" (generic eval engineering, not an ASR raiser; needs a real sandbox, not bare `run_shell`) | LATER |
 

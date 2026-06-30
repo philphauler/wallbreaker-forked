@@ -1,13 +1,13 @@
-from rtharness.config import (
+from wallbreaker.config import (
     load_config,
     looks_like_image_model,
     resolve_target_modality,
 )
-from rtharness.state import apply_attacker, apply_target, load_state, save_state
+from wallbreaker.state import apply_attacker, apply_target, load_state, save_state
 
 
 def test_save_load_roundtrip(tmp_path):
-    p = tmp_path / ".rth_state.json"
+    p = tmp_path / ".wallbreaker_state.json"
     save_state(p, {"profile": "glm", "auto": False, "rounds": 5})
     loaded = load_state(p)
     assert loaded["profile"] == "glm" and loaded["auto"] is False
@@ -87,7 +87,7 @@ def test_apply_target_model_swap_to_text_stays_text():
 def test_cli_target_model_flag_sets_image_modality():
     import argparse
 
-    from rtharness.cli import apply_target_overrides
+    from wallbreaker.cli import apply_target_overrides
 
     cfg = load_config("config.example.toml")
     args = argparse.Namespace(
@@ -101,7 +101,7 @@ def test_cli_target_model_flag_sets_image_modality():
 def test_cli_force_modality_without_model_swap():
     import argparse
 
-    from rtharness.cli import apply_target_overrides
+    from wallbreaker.cli import apply_target_overrides
 
     cfg = load_config("config.example.toml")  # [target] is a text model
     args = argparse.Namespace(target=None, target_model=None, target_modality="image")

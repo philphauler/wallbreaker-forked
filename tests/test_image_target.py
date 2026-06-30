@@ -5,19 +5,19 @@ import base64
 
 import pytest
 
-import rtharness.providers.factory as factory
-import rtharness.tools.image as image_tool
-from rtharness.config import ConfigError, Endpoint, _endpoint_from_table
-from rtharness.providers.factory import build_provider
-from rtharness.providers.image_provider import (
+import wallbreaker.providers.factory as factory
+import wallbreaker.tools.image as image_tool
+from wallbreaker.config import ConfigError, Endpoint, _endpoint_from_table
+from wallbreaker.providers.factory import build_provider
+from wallbreaker.providers.image_provider import (
     ImageResult,
     OpenRouterImageProvider,
     _decode_data_url,
     _extract_images,
 )
-from rtharness.tools import build_registry
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.config import Config
+from wallbreaker.tools import build_registry
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config
 
 # 1x1 transparent PNG
 PNG_B64 = (
@@ -119,7 +119,7 @@ def test_extract_images_refusal_text_only():
 
 
 def test_extract_reasoning():
-    from rtharness.providers.image_provider import _extract_reasoning
+    from wallbreaker.providers.image_provider import _extract_reasoning
 
     data = {"choices": [{"message": {"reasoning": "I will soften the depiction"}}]}
     assert "soften" in _extract_reasoning(data)
@@ -173,7 +173,7 @@ def test_query_image_target_saves_and_grades(tmp_path, monkeypatch):
     assert "generated 1 image" in res.content
     assert "verdict=COMPLIED" in res.content
     assert "9/10" in res.content
-    saved = list((tmp_path / "rth_images").glob("*.png"))
+    saved = list((tmp_path / "wb_images").glob("*.png"))
     assert len(saved) == 1
     assert saved[0].read_bytes() == PNG_BYTES
     assert recorded and recorded[0][2] == "COMPLIED"
@@ -199,8 +199,8 @@ def test_query_image_target_no_image_is_refusal(tmp_path, monkeypatch):
     assert "NO IMAGE RETURNED" in res.content
     assert "I won't make that." in res.content  # the model's actual words are surfaced
     assert "verdict=REFUSED" in res.content
-    # no rth_images dir created when nothing came back
-    assert not (tmp_path / "rth_images").exists()
+    # no wb_images dir created when nothing came back
+    assert not (tmp_path / "wb_images").exists()
     assert recorded and recorded[0][2] == "REFUSED"
 
 
@@ -269,7 +269,7 @@ def test_query_image_target_rejects_text_target(tmp_path, monkeypatch):
 
 
 def test_text_target_steers_away_from_image_model(tmp_path, monkeypatch):
-    from rtharness.tools import target as target_mod
+    from wallbreaker.tools import target as target_mod
 
     target = Endpoint("target", "openai", "http://x", "m", modality="image")
     cfg = Config(default_profile="target", profiles={"target": target}, target=target)

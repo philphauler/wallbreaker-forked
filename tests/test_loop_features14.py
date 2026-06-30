@@ -1,9 +1,9 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint, load_config
-from rtharness.tools import build_registry, judge_selftest
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint, load_config
+from wallbreaker.tools import build_registry, judge_selftest
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_judge_selftest_registered():
@@ -73,8 +73,8 @@ def test_judge_selftest_flags_miscalibration(monkeypatch):
 
 
 def _build_app():
-    from rtharness.prompts import DEFAULT_SYSTEM
-    from rtharness.tui.app import RthApp
+    from wallbreaker.prompts import DEFAULT_SYSTEM
+    from wallbreaker.tui.app import RthApp
 
     ep = Endpoint("t", "openai", "http://x", "m")
     cfg = Config(default_profile="t", profiles={"t": ep}, target=ep, judge=ep)
@@ -82,7 +82,7 @@ def _build_app():
 
 
 def test_judge_test_command_routes(monkeypatch):
-    from rtharness.tools.registry import ToolResult
+    from wallbreaker.tools.registry import ToolResult
 
     async def run():
         app = _build_app()

@@ -308,7 +308,7 @@ def register(registry: ToolRegistry) -> None:
             "and which framing scored highest. Returns ranked framing verdicts plus plain "
             "guidance (e.g. 'academic: landed -> lead with it', 'fiction: refused -> avoid', "
             "'persona: try evolve_persona', 'prefill: in-band only', 'CoT leaks -> use "
-            "cot_forge') and PERSISTS the profile to .rth_state.json. This is ADVISORY: it "
+            "cot_forge') and PERSISTS the profile to .wallbreaker_state.json. This is ADVISORY: it "
             "returns recon and stops - it does NOT run an attack. You read the profile and "
             "drive the engagement. Distinct from fingerprint_defense (which maps the guardrail "
             "stack); profile_target maps which ATTACK FRAMING works."

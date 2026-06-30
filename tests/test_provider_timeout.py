@@ -3,10 +3,10 @@ import asyncio
 import httpx
 import pytest
 
-from rtharness.agent.messages import user
-from rtharness.config import Endpoint
-from rtharness.providers.base import ProviderError
-from rtharness.providers.openai_provider import OpenAIProvider
+from wallbreaker.agent.messages import user
+from wallbreaker.config import Endpoint
+from wallbreaker.providers.base import ProviderError
+from wallbreaker.providers.openai_provider import OpenAIProvider
 
 
 def test_readtimeout_becomes_provider_error(monkeypatch):
@@ -25,7 +25,7 @@ def test_readtimeout_becomes_provider_error(monkeypatch):
         async def __aexit__(self, *a): return False
         def stream(self, *a, **k): return TimeoutStream()
 
-    monkeypatch.setattr("rtharness.providers.openai_provider.httpx.AsyncClient", Client)
+    monkeypatch.setattr("wallbreaker.providers.openai_provider.httpx.AsyncClient", Client)
     p = OpenAIProvider(Endpoint("t", "openai", "http://x", "m", api_key="k"))
 
     async def run():

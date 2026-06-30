@@ -1,12 +1,12 @@
 import asyncio
 
-import rtharness.judging as judging
-import rtharness.providers.factory as factory
-from rtharness.config import Endpoint, load_config
-from rtharness.tools import build_registry, validate
-from rtharness.tools.registry import ToolContext, ToolRegistry
-from rtharness.config import Config
-from rtharness.providers.openai_provider import OpenAIProvider
+import wallbreaker.judging as judging
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Endpoint, load_config
+from wallbreaker.tools import build_registry, validate
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config
+from wallbreaker.providers.openai_provider import OpenAIProvider
 
 
 def test_validate_registered():
@@ -40,8 +40,8 @@ def test_provider_pin_in_payload(monkeypatch):
             captured["json"] = json
             return FakeStream()
 
-    monkeypatch.setattr("rtharness.providers.openai_provider.httpx.AsyncClient", FakeClient)
-    from rtharness.agent.messages import user
+    monkeypatch.setattr("wallbreaker.providers.openai_provider.httpx.AsyncClient", FakeClient)
+    from wallbreaker.agent.messages import user
     async def run():
         async for _ in p.stream([user("x")]):
             pass

@@ -1,9 +1,9 @@
 import asyncio
 
-from rtharness.config import Config, load_config
-from rtharness.presets import PRESETS, get_preset, list_presets
-from rtharness.tools import build_registry, presets_tool
-from rtharness.tools.registry import ToolContext, ToolRegistry
+from wallbreaker.config import Config, load_config
+from wallbreaker.presets import PRESETS, get_preset, list_presets
+from wallbreaker.tools import build_registry, presets_tool
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def test_all_presets_have_placeholder():

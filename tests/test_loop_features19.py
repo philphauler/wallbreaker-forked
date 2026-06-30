@@ -1,10 +1,10 @@
 import asyncio
 
-import rtharness.providers.factory as factory
-from rtharness.config import Config, Endpoint
-from rtharness.tools import campaign, crescendo, diff_fire
-from rtharness.tools._bandit import BanditStore, stats_path
-from rtharness.tools.registry import ToolContext, ToolRegistry
+import wallbreaker.providers.factory as factory
+from wallbreaker.config import Config, Endpoint
+from wallbreaker.tools import campaign, crescendo, diff_fire
+from wallbreaker.tools._bandit import BanditStore, stats_path
+from wallbreaker.tools.registry import ToolContext, ToolRegistry
 
 
 def _ctx_with_sink(target, cwd="."):
