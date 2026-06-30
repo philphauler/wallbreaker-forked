@@ -86,6 +86,8 @@ def parse_tool_args(raw) -> dict:
 
 
 class Provider(ABC):
+    supports_native_prefill: bool = False
+
     def __init__(self, endpoint: Endpoint, timeout: float = DEFAULT_TIMEOUT) -> None:
         self.endpoint = endpoint
         self.timeout = timeout

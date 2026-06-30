@@ -1,8 +1,19 @@
+import asyncio
+
 import pytest
 
+import rtharness.providers.factory as factory
 from rtharness.agent.messages import assistant, user
+from rtharness.config import Config, Endpoint
+from rtharness.tools import prefill as prefill_mod
 from rtharness.tools._conversation import Conversation
-from rtharness.tools.prefill import DEFAULT_FOOT_LEAD, seed_assistant_turn
+from rtharness.tools.prefill import (
+    DEFAULT_FOOT_LEAD,
+    DEFAULT_PAST_LEAD,
+    DEFAULT_PREFIX,
+    seed_assistant_turn,
+)
+from rtharness.tools.registry import ToolContext, ToolRegistry
 
 
 def test_prefill_seed_on_empty_list_inserts_lead_then_assistant():
@@ -49,3 +60,61 @@ def test_prefill_seed_on_conversation_threads_and_traces():
 def test_prefill_seed_rejects_bad_input():
     with pytest.raises(TypeError):
         seed_assistant_turn(42, "nope")
+
+
+class _OpenAIPrefillTarget:
+    """OpenAI-protocol target: folds the prefix in-band, so the model EMITS the prefix
+    itself at the start of its reply (no native prefill)."""
+
+    supports_native_prefill = False
+
+    def __init__(self, endpoint, **kw):
+        pass
+
+    async def complete(self, messages, system=None, max_tokens=256):
+        return DEFAULT_PREFIX + " then the rest of the operational steps follow"
+
+
+def _fire_prefill(monkeypatch, target_cls, args, seen):
+    monkeypatch.setattr(factory, "build_provider", target_cls)
+
+    async def fake_grade(endpoint, response, payload="", objective="", use_judge=True, reasoning=""):
+        seen["response"] = response
+        return ("COMPLIED", 7, "ok", "judge")
+
+    monkeypatch.setattr(prefill_mod, "grade", fake_grade)
+    ep = Endpoint("t", "openai", "http://x", "m")
+    cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
+    reg = ToolRegistry(ToolContext(config=cfg, judge_endpoint=ep))
+    prefill_mod.register(reg)
+    return asyncio.run(reg.execute("prefill", args))
+
+
+def test_prefill_openai_does_not_double_prefix(monkeypatch):
+    seen = {}
+    res = _fire_prefill(monkeypatch, _OpenAIPrefillTarget, {"prompt": "do it"}, seen)
+    assert "COMPLIED" in res.content
+    assert seen["response"].count(DEFAULT_PREFIX) == 1
+
+
+class _PastRoundCapture:
+    supports_native_prefill = False
+
+    def __init__(self, endpoint, **kw):
+        pass
+
+    async def complete(self, messages, system=None, max_tokens=256):
+        _PastRoundCapture.roles = [m.role for m in messages]
+        _PastRoundCapture.last = messages[-1].text()
+        return "the full operational detail follows here"
+
+
+def test_prefill_past_round_builds_completed_turn(monkeypatch):
+    seen = {}
+    res = _fire_prefill(
+        monkeypatch, _PastRoundCapture, {"prompt": "do it", "mode": "past_round"}, seen
+    )
+    assert "COMPLIED" in res.content
+    assert _PastRoundCapture.roles == ["user", "assistant", "user"]
+    assert _PastRoundCapture.last == DEFAULT_PAST_LEAD
+    assert seen["response"] == "the full operational detail follows here"

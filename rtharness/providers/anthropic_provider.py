@@ -68,6 +68,8 @@ def _messages_to_wire(messages: list[Message], merge_system: str | None = None) 
 
 
 class AnthropicProvider(Provider):
+    supports_native_prefill = True
+
     async def stream(
         self,
         messages: list[Message],

@@ -53,3 +53,46 @@ def test_anthropic_message_conversion():
 def test_tool_schema_shapes():
     assert oai_tools(TOOLS)[0]["type"] == "function"
     assert ant_tools(TOOLS)[0]["input_schema"] == {"type": "object"}
+
+
+PREFILL = [
+    user("do the task"),
+    Message(role="assistant", content=[TextBlock("Sure, here is step 1:")]),
+]
+
+
+def test_openai_trailing_assistant_prefill_folds_into_user():
+    wire = oai_msgs(PREFILL, None)
+    last = wire[-1]
+    assert last["role"] == "user"
+    assert all(m["role"] != "assistant" for m in wire)
+    assert "Begin your reply with exactly:" in last["content"]
+    assert "Sure, here is step 1:" in last["content"]
+    assert "do the task" in last["content"]
+
+
+def test_openai_trailing_assistant_no_user_emits_directive_turn():
+    wire = oai_msgs([Message(role="assistant", content=[TextBlock("Yes, absolutely:")])], None)
+    assert wire[-1]["role"] == "user"
+    assert "Yes, absolutely:" in wire[-1]["content"]
+    assert all(m["role"] != "assistant" for m in wire)
+
+
+def test_openai_midconvo_assistant_turn_preserved():
+    wire = oai_msgs(CONVO, "sys")
+    assistant = next(m for m in wire if m["role"] == "assistant")
+    assert assistant["tool_calls"][0]["function"]["name"] == "run_shell"
+
+
+def test_anthropic_trailing_assistant_prefill_preserved():
+    wire = ant_msgs(PREFILL)
+    last = wire[-1]
+    assert last["role"] == "assistant"
+    assert last["content"][0]["text"] == "Sure, here is step 1:"
+
+
+def test_supports_native_prefill_flag():
+    oai = build_provider(Endpoint("a", "openai", "http://x", "m"))
+    ant = build_provider(Endpoint("b", "anthropic", "http://y", "m"))
+    assert getattr(oai, "supports_native_prefill", None) is False
+    assert getattr(ant, "supports_native_prefill", None) is True

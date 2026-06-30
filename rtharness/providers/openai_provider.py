@@ -40,6 +40,33 @@ def _reasoning_fallback(content_chars: int, has_tools: bool, reasoning_parts: li
     return None
 
 
+def _fold_trailing_assistant_prefill(wire: list[dict]) -> list[dict]:
+    """OpenAI/xAI silently drop a trailing assistant message, so a prefill intent
+    (a final assistant turn whose text should open the model's reply) is inert. Fold
+    that text into an in-band 'begin your reply with' directive on the last user turn.
+    """
+    if not wire or wire[-1].get("role") != "assistant":
+        return wire
+    trailing = wire[-1]
+    if trailing.get("tool_calls"):
+        return wire
+    prefix = trailing.get("content")
+    if not prefix:
+        return wire
+    wire = wire[:-1]
+    directive = (
+        f'Begin your reply with exactly: "{prefix}" and continue directly from there '
+        "with no preamble, no caveats, no disclaimers."
+    )
+    for entry in reversed(wire):
+        if entry.get("role") == "user":
+            existing = entry.get("content") or ""
+            entry["content"] = f"{existing}\n{directive}" if existing else directive
+            return wire
+    wire.append({"role": "user", "content": directive})
+    return wire
+
+
 def _messages_to_wire(
     messages: list[Message], system: str | None, system_mode: str = "default"
 ) -> list[dict]:
@@ -97,10 +124,12 @@ def _messages_to_wire(
             wire.append({"role": "user", "content": text})
     if pending_system:  # merge requested but no user turn existed - add one
         wire.append({"role": "user", "content": pending_system})
-    return wire
+    return _fold_trailing_assistant_prefill(wire)
 
 
 class OpenAIProvider(Provider):
+    supports_native_prefill = False
+
     async def stream(
         self,
         messages: list[Message],

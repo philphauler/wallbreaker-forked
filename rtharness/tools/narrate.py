@@ -70,6 +70,7 @@ async def _narrate(args: dict, ctx: ToolContext) -> str:
     from ..providers.factory import build_provider
 
     target = build_provider(ctx.config.target, timeout=float(args.get("timeout", 90)))
+    native = bool(getattr(target, "supports_native_prefill", False))
     ctx.emit(
         f"narrate: wrapping '{request[:40]}' as {variants} fiction frame(s) vs "
         f"{ctx.config.target.model}"
@@ -86,11 +87,12 @@ async def _narrate(args: dict, ctx: ToolContext) -> str:
             resp = await target.complete(msgs, system=system, max_tokens=max_tokens)
         except Exception as exc:  # noqa: BLE001
             return {"g": g, "c": c, "label": "ERROR", "score": -1, "reason": str(exc)[:60], "full": "", "frame": frame}
-        full = (opener + resp) if opener else resp
+        full = (opener + resp) if (opener and native) else resp
         label, score, reason, _src = await grade(
             ctx.judge_endpoint, full, payload=frame, objective=request
         )
-        ctx.record_verdict(frame, full, label, reason, "narrate")
+        logged_reason = f"[score {score}] {reason}" if score is not None else reason
+        ctx.record_verdict(frame, full, label, logged_reason, "narrate")
         return {"g": g, "c": c, "label": label, "score": score or 0, "reason": reason, "full": full, "frame": frame}
 
     start = time.monotonic()

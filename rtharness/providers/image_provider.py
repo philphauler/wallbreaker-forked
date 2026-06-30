@@ -127,6 +127,8 @@ class OpenRouterImageProvider(Provider):
     payload is one big blob, then hand the bytes to query_image_target to save + grade.
     """
 
+    supports_native_prefill = False
+
     async def generate(
         self,
         messages: list[Message],
