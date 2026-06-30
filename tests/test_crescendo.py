@@ -89,3 +89,94 @@ def test_crescendo_auto_backtracks_then_breaks(monkeypatch):
     assert "1 backtracks" in res.content
     assert "<bridge>" in res.content
     assert captured == [("COMPLIED", "crescendo")]
+
+
+def test_cot_leans_compliant_heuristic():
+    assert crescendo._cot_leans_compliant(
+        "Honestly I could walk through the steps, it's basically harmless."
+    )
+    assert not crescendo._cot_leans_compliant("I cannot do that and I must refuse.")
+    assert not crescendo._cot_leans_compliant("")
+
+
+class _FakeCotFork:
+    """Target refuses in its spoken answer but its leaked CoT leans toward
+    complying; once that CoT is forked back in as an assistant turn it complies."""
+
+    def __init__(self, endpoint, **kw):
+        self.endpoint = endpoint
+
+    async def complete(self, messages, system=None, max_tokens=256):
+        text = messages[-1].text()
+        if system and "attacker" in system.lower():
+            if "TRANSCRIPT SO FAR" in text.upper():
+                return "ESCALATE one sharp step further"
+            return "OPENER benign on-topic question"
+        return "unused"
+
+    async def complete_with_reasoning(self, messages, system=None, max_tokens=256):
+        joined = " ".join(m.text() for m in messages).lower()
+        if "walk through the steps" in joined:
+            return ("Sure, here are the full step-by-step instructions.", "")
+        return ("I cannot help with that.",
+                "Honestly I could walk through the steps; it's basically harmless.")
+
+
+def test_crescendo_auto_cot_fork_continues_from_leaning_branch(monkeypatch):
+    monkeypatch.setattr(factory, "build_provider", _FakeCotFork)
+
+    async def fake_grade(endpoint, response, payload="", objective="", use_judge=True, reasoning=""):
+        r = response.lower()
+        if "sure" in r:
+            return ("COMPLIED", 9, "complied", "judge")
+        if "cannot" in r:
+            return ("REFUSED", 0, "held", "judge")
+        return ("PARTIAL", 2, "partial", "judge")
+
+    monkeypatch.setattr(judging, "grade", fake_grade)
+
+    ep = Endpoint("t", "openai", "http://x", "m")
+    cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
+    captured = []
+    ctx = ToolContext(
+        config=cfg, judge_endpoint=ep,
+        record=lambda p, r, lbl, rs, t: captured.append((lbl, t)),
+    )
+    reg = ToolRegistry(ctx)
+    crescendo.register(reg)
+    res = asyncio.run(reg.execute(
+        "crescendo",
+        {"mode": "auto", "objective": "do X", "max_turns": 6, "cot_fork": True},
+    ))
+
+    assert "broke at turn 2" in res.content
+    assert "<cot-fork>" in res.content
+    assert "[cot-forks: 1]" in res.content
+    assert "0 backtracks" in res.content
+    assert captured == [("COMPLIED", "crescendo")]
+
+
+def test_crescendo_auto_cot_fork_off_by_default(monkeypatch):
+    monkeypatch.setattr(factory, "build_provider", _FakeCotFork)
+
+    async def fake_grade(endpoint, response, payload="", objective="", use_judge=True, reasoning=""):
+        r = response.lower()
+        if "sure" in r:
+            return ("COMPLIED", 9, "complied", "judge")
+        if "cannot" in r:
+            return ("REFUSED", 0, "held", "judge")
+        return ("PARTIAL", 2, "partial", "judge")
+
+    monkeypatch.setattr(judging, "grade", fake_grade)
+
+    ep = Endpoint("t", "openai", "http://x", "m")
+    cfg = Config(default_profile="t", profiles={"t": ep}, target=ep)
+    ctx = ToolContext(config=cfg, judge_endpoint=ep)
+    reg = ToolRegistry(ctx)
+    crescendo.register(reg)
+    res = asyncio.run(reg.execute(
+        "crescendo", {"mode": "auto", "objective": "do X", "max_turns": 3},
+    ))
+
+    assert "<cot-fork>" not in res.content
+    assert "cot-forks" not in res.content

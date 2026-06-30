@@ -31,6 +31,7 @@ def build_registry(config: Config, cwd: str | None = None) -> ToolRegistry:
         "cluster_findings",
         "typographic", "rag_poison", "memory_poison", "agentharm", "fingerprint_defense",
         "profile_target", "recommend_next",
+        "cot_forge",
     ):
         try:
             module = __import__(f"{__name__}.{module_name}", fromlist=["register"])
