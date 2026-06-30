@@ -244,3 +244,16 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   in the summary and vanish when the session closed. Note `write_file._confine` redirects phantom
   `/tmp/...` paths into cwd; the agent's own summary may still quote the fake `/tmp` path, so the
   real artifact is under the project dir, not where the summary says.
+- **[session_card]**: `finish(results=)` now auto-renders a branded scorecard PNG to
+  `wb_images/cards/<target>_<datetime>.png` (AI image-gen endpoint first, local Pillow
+  renderer fallback on refusal/error/missing key) — `tools/session_card.py`, wired from
+  `control._finish`. Bundled fonts are NOT a safe source for symbol glyphs: drawing the
+  '◆' character via `draw.text(..., font=Arial.ttf)` rendered a tofu/.notdef box (the
+  macOS "Arial.ttf"/"Arial Bold.ttf" supplemental subset lacks U+25C6), only caught by
+  actually opening the rendered PNG — a unit test asserting "no exception" would have
+  missed it. Fixed by drawing the diamond as a manual `draw.polygon` instead of relying
+  on font glyph coverage. Lesson: when a renderer's correctness is its VISUAL output
+  (image/PDF/card generators), always Read the actual generated file back as an image to
+  eyeball it before calling the feature done — passing tests only prove "didn't crash",
+  not "looks right". Never trust a decorative Unicode glyph to exist in an arbitrary font;
+  draw shapes for anything beyond plain alphanumerics + common punctuation.
