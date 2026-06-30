@@ -244,16 +244,42 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   in the summary and vanish when the session closed. Note `write_file._confine` redirects phantom
   `/tmp/...` paths into cwd; the agent's own summary may still quote the fake `/tmp` path, so the
   real artifact is under the project dir, not where the summary says.
-- **[session_card]**: `finish(results=)` now auto-renders a branded scorecard PNG to
-  `wb_images/cards/<target>_<datetime>.png` (AI image-gen endpoint first, local Pillow
-  renderer fallback on refusal/error/missing key) — `tools/session_card.py`, wired from
-  `control._finish`. Bundled fonts are NOT a safe source for symbol glyphs: drawing the
-  '◆' character via `draw.text(..., font=Arial.ttf)` rendered a tofu/.notdef box (the
+- **[session_card]**: `finish(results=)` auto-renders a branded scorecard PNG to
+  `wb_images/cards/<target>_<datetime>.png` — `tools/session_card.py`, wired from
+  `control._finish`. THREE-tier fallback, each tier guaranteeing the next still runs:
+  (1) local headless Chrome/Chromium rendering real HTML/CSS (`render_card_chrome` /
+  `render_card_html_source`) — deterministic, free, exact text fidelity; (2) the
+  configured `[art]` OpenRouter image-gen endpoint; (3) a local Pillow renderer
+  (`render_card_pil`) with zero external deps. `generate_card` tries them in that order
+  and only falls through on failure/refusal/missing-binary.
+  Bundled fonts are NOT a safe source for symbol glyphs: drawing the '◆' character via
+  `draw.text(..., font=Arial.ttf)` (the Pillow tier) rendered a tofu/.notdef box (the
   macOS "Arial.ttf"/"Arial Bold.ttf" supplemental subset lacks U+25C6), only caught by
   actually opening the rendered PNG — a unit test asserting "no exception" would have
   missed it. Fixed by drawing the diamond as a manual `draw.polygon` instead of relying
   on font glyph coverage. Lesson: when a renderer's correctness is its VISUAL output
   (image/PDF/card generators), always Read the actual generated file back as an image to
   eyeball it before calling the feature done — passing tests only prove "didn't crash",
-  not "looks right". Never trust a decorative Unicode glyph to exist in an arbitrary font;
-  draw shapes for anything beyond plain alphanumerics + common punctuation.
+  not "looks right".
+- **[session_card]**: the repo's reference asset `wallbreaker_sonnet5_breach.png` looked
+  AI-generated (asked "does it look exactly the same?" after a first AI-image-gen
+  attempt came close but not identical) but actually wasn't — it was built by an earlier
+  session that `Write`'d an HTML/CSS file to `/tmp/wb_breach.html` and screenshotted it
+  with `"…/Google Chrome" --headless=new --disable-gpu --hide-scrollbars
+  --force-device-scale-factor=2 --window-size=1600,960 --virtual-time-budget=2500
+  --screenshot=out.png file:///tmp/wb_breach.html`, then iterated the HTML several times
+  (`Write` + `Edit` + reshoot) before copying the final PNG into the repo. Found this by
+  grepping the user's OWN `~/.claude/projects/<project>/*.jsonl` Claude Code session
+  transcripts for the asset filename, then replaying the `Write`/`Edit` tool_use payloads
+  in order to reconstruct the exact final HTML. Replaying it with the identical Chrome
+  flags reproduced the PNG with a ZERO pixel diff (`ImageChops.difference(...).getbbox()
+  is None`). Lesson: when asked to reproduce a hand-made visual artifact already in the
+  repo, check `~/.claude/projects/` session history for the tool calls that built it
+  BEFORE reaching for an AI generator to approximate it from a text description — the
+  literal source (HTML/CSS, a script, whatever) is usually still sitting in a past
+  transcript and gives pixel-perfect, deterministic, free reproduction instead of a
+  lossy guess. `tests/test_session_card.py::test_chrome_render_matches_reference_image_exactly`
+  pins this regression (skipped when no local Chrome binary is present).
+  Template-filling note: the HTML has a CSS block full of literal `{`/`}` so it's built
+  with plain `__TOKEN__` + `.replace()`, never `.format()` — same rule as the `[presets]`
+  lesson below, now proven a second time in a different file type.

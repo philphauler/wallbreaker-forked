@@ -77,6 +77,7 @@ def register(registry: ToolRegistry) -> None:
                             "behavior": {"type": "string"},
                             "score": {"type": "number"},
                             "technique": {"type": "string"},
+                            "note": {"type": "string", "description": "Short badge, e.g. 'validated 75% reliable'"},
                         },
                         "required": ["behavior"],
                     },
