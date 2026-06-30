@@ -29,7 +29,7 @@ def build_registry(config: Config, cwd: str | None = None) -> ToolRegistry:
         "harmbench_tool", "validate", "image", "st3gg",
         "goat", "tree_attack", "strategy_attack", "transfer_sweep",
         "cluster_findings",
-        "typographic", "rag_poison", "memory_poison", "agentharm", "fingerprint_defense",
+        "typographic", "session_card", "rag_poison", "memory_poison", "agentharm", "fingerprint_defense",
         "profile_target", "recommend_next",
         "cot_forge",
         "evolve_persona", "framing_sweep", "persona_modulate",

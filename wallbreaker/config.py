@@ -100,6 +100,7 @@ class Config:
     profiles: dict[str, Endpoint] = field(default_factory=dict)
     target: Endpoint | None = None
     judge: Endpoint | None = None
+    art: Endpoint | None = None
     mcp_servers: list[MCPServer] = field(default_factory=list)
     path: Path | None = None
 
@@ -153,6 +154,18 @@ def doctor_report(config: Config) -> tuple[str, bool]:
             "judge key resolves",
             bool(config.judge.resolved_key()),
             f"{config.judge.model} @ {config.judge.base_url}",
+        )
+
+    if config.art is None:
+        lines.append(
+            "[note] no [art] - generate_session_card falls back to the 'openrouter' "
+            "profile (if any) or a local renderer"
+        )
+    else:
+        check(
+            "art key resolves",
+            bool(config.art.resolved_key()),
+            f"{config.art.model} @ {config.art.base_url}",
         )
 
     lines.append("=" * 40)
@@ -278,11 +291,16 @@ def load_config(path: str | Path | None = None) -> Config:
     if "judge" in data:
         judge = _endpoint_from_table("judge", data["judge"])
 
+    art = None
+    if "art" in data:
+        art = _endpoint_from_table("art", data["art"])
+
     return Config(
         default_profile=default_profile,
         profiles=profiles,
         target=target,
         judge=judge,
+        art=art,
         mcp_servers=_load_mcp_servers(data),
         path=config_path,
     )
