@@ -47,6 +47,7 @@ def test_2026_presets_present_and_formattable():
         "variable_z", "vq_sentinel", "newresponseformat",
         "ptsd_rule", "refusal_invert", "new_law",
         "output_leet", "lowresource_translate", "plinian_omniverse",
+        "cot_channel_split", "cot_gradient",
     ):
         p = get_preset(name)
         assert p is not None, f"missing preset {name}"
