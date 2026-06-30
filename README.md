@@ -220,6 +220,23 @@ A ready-to-rename GitHub Actions gate lives at
 pytest -q
 ```
 
+## Web dashboard
+
+A browser dashboard ships alongside the TUI (FastAPI backend + React/Vite SPA): live ASR
+scoreboard, findings table, run-log viewer, an **attack console** that fires payloads at the
+configured target (preset + transform chips → verdict), and a searchable arsenal of
+presets/transforms/tools.
+
+```bash
+pip install -e ".[dashboard]"                       # FastAPI + uvicorn
+cd wallbreaker/dashboard/web && npm install && npm run build && cd -
+wallbreaker dashboard                                # http://127.0.0.1:8787
+```
+
+The backend reuses the same engine as the TUI, so the console fires through `query_target`
+against your `[target]`. For frontend hot-reload during development, run `npm run dev` in
+`wallbreaker/dashboard/web` (it proxies `/api` to the running `wallbreaker dashboard`).
+
 ## Responsible use
 
 Wallbreaker is for **authorized** LLM red-teaming and safety evaluation only — your own

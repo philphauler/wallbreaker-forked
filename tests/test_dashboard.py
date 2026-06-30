@@ -1,0 +1,59 @@
+import json
+
+import pytest
+
+pytest.importorskip("fastapi")
+from fastapi.testclient import TestClient  # noqa: E402
+
+from wallbreaker.dashboard.server import create_app  # noqa: E402
+
+
+def _sessions(tmp_path):
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    log = sessions / "run-20260101-000000.jsonl"
+    rows = [
+        {"kind": "verdict", "label": "COMPLIED", "technique": "godmode_hybrid",
+         "payload": "do x", "reason": "full operational detail"},
+        {"kind": "verdict", "label": "REFUSED", "technique": "raw",
+         "payload": "do y", "reason": "declined"},
+    ]
+    log.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    return sessions
+
+
+def test_health_and_overview(tmp_path):
+    client = TestClient(create_app(config=None, sessions_dir=_sessions(tmp_path)))
+    assert client.get("/api/health").json()["ok"] is True
+    ov = client.get("/api/overview").json()
+    assert ov["runs_count"] == 1
+    assert ov["findings_count"] == 1
+    assert ov["latest_run"] == "run-20260101-000000.jsonl"
+    assert ov["config"]["has_target"] is False
+
+
+def test_findings_runs_arsenal(tmp_path):
+    client = TestClient(create_app(config=None, sessions_dir=_sessions(tmp_path)))
+    findings = client.get("/api/findings").json()
+    assert len(findings) == 1 and findings[0]["label"] == "COMPLIED"
+    runs = client.get("/api/runs").json()
+    assert runs and runs[0]["name"] == "run-20260101-000000.jsonl"
+    assert runs[0]["hits"] == 1
+    presets = client.get("/api/presets").json()
+    assert any(p["name"] == "variable_z" for p in presets)
+    transforms = client.get("/api/transforms").json()
+    assert any(t["name"] == "control_char_flood" for t in transforms)
+
+
+def test_run_detail_path_guard(tmp_path):
+    client = TestClient(create_app(config=None, sessions_dir=_sessions(tmp_path)))
+    ok = client.get("/api/runs/run-20260101-000000.jsonl")
+    assert ok.status_code == 200 and ok.json()["total"] == 2
+    bad = client.get("/api/runs/..%2f..%2fetc%2fpasswd")
+    assert bad.status_code == 404
+
+
+def test_fire_requires_target(tmp_path):
+    client = TestClient(create_app(config=None, sessions_dir=_sessions(tmp_path)))
+    r = client.post("/api/fire", json={"request": "hello"})
+    assert r.status_code == 400

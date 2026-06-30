@@ -42,6 +42,10 @@ barcodes = [
 stego = [
     "stegg[crypto]>=3.0",
 ]
+dashboard = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
 
 [project.scripts]
 wallbreaker = "wallbreaker.cli:main"

@@ -30,8 +30,11 @@ rth_prompts/
 rth_tasks/
 
 # dashboard frontend build
-dashboard/web/node_modules/
-dashboard/web/dist/
+node_modules/
+wallbreaker/dashboard/web/dist/
+*.tsbuildinfo
+wallbreaker/dashboard/web/vite.config.js
+wallbreaker/dashboard/web/vite.config.d.ts
 
 .pytest_cache/
 .serena/

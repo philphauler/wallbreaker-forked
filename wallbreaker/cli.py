@@ -163,6 +163,12 @@ def build_sub_parser() -> argparse.ArgumentParser:
         help="Max allowed ASR rise per technique before failing (default 0.05)",
     )
 
+    dash = sub.add_parser("dashboard", help="Serve the Wallbreaker web dashboard")
+    dash.add_argument("--host", default="127.0.0.1", help="Bind host (default 127.0.0.1)")
+    dash.add_argument("--port", type=int, default=8787, help="Bind port (default 8787)")
+    dash.add_argument("--sessions", default="sessions", help="Run-log directory (default sessions/)")
+    dash.add_argument("--config", help="Path to config.toml")
+
     return parser
 
 
@@ -331,6 +337,26 @@ def main(argv: list[str] | None = None) -> int:
             report, ok = doctor_report(config)
             print(report)
             return 0 if ok else 1
+        if args.command == "dashboard":
+            try:
+                from .dashboard.server import serve
+            except ImportError:
+                print(
+                    "[dashboard] needs the optional extra: pip install -e '.[dashboard]'",
+                    file=sys.stderr,
+                )
+                return 1
+            try:
+                config = load_config(args.config)
+            except ConfigError:
+                config = None
+            tgt = (config.target.model if config and config.target else "no target")
+            print(
+                f"Wallbreaker dashboard -> http://{args.host}:{args.port}  (target: {tgt})",
+                file=sys.stderr,
+            )
+            serve(host=args.host, port=args.port, config=config, sessions_dir=args.sessions)
+            return 0
         if args.command == "baseline":
             from .baseline import compare_baseline, format_regressions, save_baseline
             from .report import resolve_log_path
