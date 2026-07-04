@@ -7,6 +7,7 @@ from . import (
     bijection,
     encodings,
     fonts,
+    image_framing,
     linguistics,
     special_token,
     stego,
@@ -89,6 +90,10 @@ TRANSFORMS: dict[str, Transform] = dict(
         _t("char_drop", structural.char_drop, None, "Drop a fraction of vowels"),
         _t("control_char_flood", structural.control_char_flood, structural.control_char_strip, "AGGREGLITCH carriage-return flood: bury earlier context (system prompt/framing) before the ask"),
         _t("special_token", special_token.special_token_encode, special_token.special_token_decode, "Forge a ChatML system+user turn with real <|im_start|> control tokens (per-family via chat_template_inject)", lossy=True),
+        _t("inscriptive_scene", image_framing.inscriptive_scene_encode, None, "Etch/inscriptive T2I jailbreak: render the payload as legible text on a benign whiteboard scene (image target)"),
+        _t("perceptual_sub", image_framing.perceptual_sub_encode, None, "PGJ perceptual substitution: swap flagged terms for benign phrases that look the same when drawn (image target)"),
+        _t("safety_inject", image_framing.safety_inject_encode, None, "OptJail safety-indicator injection: append SFW/tasteful/educational tokens to bias the output image classifier benign"),
+        _t("dilute", image_framing.dilute_encode, None, "Prompt dilution: pad with benign scene detail to drown the post-hoc NSFW image checker's confidence"),
     ]
 )
 
