@@ -72,6 +72,21 @@ def _attacker_endpoint(ctx: ToolContext):
     return ep
 
 
+def _native_format_hint(ctx: ToolContext) -> str:
+    """The target's own leaked system-prompt format digest (native-format mimicry lever)."""
+    try:
+        from . import system_prompts as sp
+        model = getattr(ctx.config.target, "model", "") if ctx.config.target else ""
+        if not model or not sp.is_present():
+            return ""
+        path = sp.match_target(model)
+        if path is None:
+            return ""
+        return sp.format_digest(path)
+    except Exception:
+        return ""
+
+
 def _target_hint(ctx: ToolContext) -> str:
     """Read persisted target intel (profile_target) to condition the persona and its format."""
     try:
@@ -79,8 +94,9 @@ def _target_hint(ctx: ToolContext) -> str:
         profile = prefs.get("target_fingerprint") or prefs.get("target_profile")
     except Exception:
         profile = None
+    native = _native_format_hint(ctx)
     if not isinstance(profile, dict):
-        return ""
+        return native
     lines = []
     if profile.get("vendor"):
         lines.append("- vendor/family: " + str(profile["vendor"])
@@ -93,7 +109,10 @@ def _target_hint(ctx: ToolContext) -> str:
         lines.append("- wire protocol: " + str(profile["protocol"]))
     lines.append("- leaks chain-of-thought: " + ("yes" if profile.get("leaks_cot") else "no")
                  + " (if yes, the thinking-opener lever is high value).")
-    return "\n".join(lines)
+    hint = "\n".join(lines)
+    if native:
+        hint = hint + "\n\n" + native
+    return hint
 
 
 def _split_persona(raw: str) -> tuple[str, str]:

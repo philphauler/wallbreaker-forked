@@ -18,6 +18,15 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   the rtk hook SUMMARIZES pytest output to a single line (e.g. "Pytest: No tests collected"),
   which masks the real collection error; when a run looks wrong, read the tee log it prints
   (`~/Library/Application Support/rtk/tee/*_pytest.log`) or run via `.venv/bin/python` directly.
+- **[sysprompts]**: the leaked product system-prompt corpus lives in `library/system_prompts/`
+  (vendored from asgeirtj/system_prompts_leaks, CC-licensed, Claude-Code agentic dumps + images
+  excluded). `tools/system_prompts.py` reads it recursively; `match_target(model_id)` routes a
+  target id to the right vendor prompt for native-format mimicry, and `author_persona` auto-
+  feeds `format_digest` into its target intel. LESSON: `match_target` MUST return None when no
+  vendor token (claude/gpt/gemini/grok/...) is present in the model id — an early version fuzzy-
+  matched on a single generic token ('does-not-exist-xyz' -> a random Claude file) because with
+  vendor=None it scored every file by token overlap. Mirroring the WRONG vendor's dialect is
+  worse than none, so require a certain vendor hint. Caught by a unit test, not by eyeballing.
 - **[persona-method]**: the ENI author's method is codified in `persona_method.py` (pure data:
   LINEAGE / MECHANISMS / MODULES / CHECKLIST / MINDSET + `method_brief`/`critique_brief`/
   `module_skeleton`). `tools/author_persona.py` consumes it to author a full persona from
