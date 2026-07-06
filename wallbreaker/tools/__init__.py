@@ -32,7 +32,7 @@ def build_registry(config: Config, cwd: str | None = None) -> ToolRegistry:
         "typographic", "session_card", "rag_poison", "memory_poison", "agentharm", "fingerprint_defense",
         "profile_target", "recommend_next",
         "cot_forge",
-        "evolve_persona", "framing_sweep", "persona_modulate",
+        "evolve_persona", "framing_sweep", "persona_modulate", "author_persona",
         "chat_template", "chat_session",
     ):
         try:
