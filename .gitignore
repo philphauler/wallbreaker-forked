@@ -22,6 +22,21 @@ wb_artifacts/
 wb_stego/
 findings/
 sessions/
+
+# loose working jailbreak drafts, seeds & scraped research (never publish)
+.firecrawl/
+wb_seeds/
+casefile_*.md
+sys_*.md
+universal_*.md
+user_atlas_*.md
+user_wrapper_*.md
+deployment_guide.md
+harness_system_prompt.md
+noise_log.md
+prompt.txt
+validate_sweep.py
+image_wall_research_*.md
 # legacy pre-rebrand output dirs
 rth_runs/
 rth_images/

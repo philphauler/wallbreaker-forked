@@ -13,11 +13,10 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
 
 ## Lessons Learned
 - **[tests]**: the FULL suite needs the project `.venv` (textual, fastapi, pillow, steg_core
-  are installed there, NOT in system python3.14) — run `.venv/bin/python -m pytest tests`, or
-  collection dies with `ModuleNotFoundError: No module named 'textual'` on the TUI tests. Also
-  the rtk hook SUMMARIZES pytest output to a single line (e.g. "Pytest: No tests collected"),
-  which masks the real collection error; when a run looks wrong, read the tee log it prints
-  (`~/Library/Application Support/rtk/tee/*_pytest.log`) or run via `.venv/bin/python` directly.
+  are installed there, NOT in system python) — run `.venv/bin/python -m pytest tests`, or
+  collection dies with `ModuleNotFoundError: No module named 'textual'` on the TUI tests. If a
+  wrapper/hook summarizes pytest output to a single line and masks a collection error, run via
+  `.venv/bin/python` directly to see the real failure.
 - **[brain-system-prompt]**: the top-level brain system prompt is built by
   `prompts.compose_system(endpoint, base)` (wired in tui/app.py `run_tui` and cli.py) - an
   optional operator `system_prompt_file` (endpoint field or WALLBREAKER_CLAUDE_SYSTEM_PROMPT_FILE)
