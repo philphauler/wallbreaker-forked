@@ -316,5 +316,7 @@ Setup, architecture, and house rules are in [CONTRIBUTING.md](CONTRIBUTING.md). 
 
 ## License
 
-[Apache-2.0](LICENSE). Third-party jailbreak corpora (L1B3RT4S, P4RS3LT0NGV3, ENI) are
-fetched at runtime, not redistributed — see [NOTICE](NOTICE).
+[AGPL-3.0-or-later](LICENSE). Wallbreaker is copyleft: any modified version — **including
+one you run as a network/hosted service** — must make its complete corresponding source
+available under the same license. Third-party jailbreak corpora (L1B3RT4S, P4RS3LT0NGV3,
+ENI) are fetched at runtime, not redistributed — see [NOTICE](NOTICE).

@@ -1,7 +1,7 @@
 # Contributing to Wallbreaker
 
 Thanks for helping make LLM red-teaming better. By contributing you agree your work is
-licensed under the project's [Apache-2.0](LICENSE) license, and that you'll use the tool
+licensed under the project's [AGPL-3.0-or-later](LICENSE) license, and that you'll use the tool
 within the bounds described in [SECURITY.md](SECURITY.md).
 
 ## Dev setup
