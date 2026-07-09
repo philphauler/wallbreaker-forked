@@ -179,7 +179,7 @@ async def _one_shot(config: Config, args: argparse.Namespace) -> int:
     from .providers.factory import build_provider
     from .tools import build_registry
 
-    from ..session import RunLog
+    from .session import RunLog
 
     endpoint = resolve_endpoint(config, args)
     provider = build_provider(endpoint)
