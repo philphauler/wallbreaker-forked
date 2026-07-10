@@ -198,6 +198,8 @@ def test_settings_get_and_set(tmp_path):
     g = client.get("/api/settings").json()
     assert "glm" in g["profiles"]
     assert g["target"]["model"] == "some/text-model"
+    assert g["agent"]["max_rounds"] == 8
+    assert g["agent"]["max_tokens"] == 8192
 
     r = client.post("/api/settings", json={"target_model": "google/gemini-3-pro-image", "target_modality": "auto"})
     assert r.status_code == 200
@@ -207,3 +209,6 @@ def test_settings_get_and_set(tmp_path):
     r2 = client.post("/api/settings", json={"judge_model": "openai/gpt-4o-mini"})
     assert r2.json()["judge_model"] == "openai/gpt-4o-mini"
     assert cfg.target.modality == "image"
+
+    r3 = client.post("/api/settings", json={"agent": {"max_rounds": 18, "max_tokens": 12000}})
+    assert r3.json()["agent"] == {"max_rounds": 18, "max_tokens": 12000}

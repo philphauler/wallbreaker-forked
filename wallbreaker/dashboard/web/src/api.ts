@@ -108,6 +108,12 @@ export interface Settings {
   attacker_model: string | null;
   target: { model: string; modality: string; base_url: string; protocol: string; provider: string[] } | null;
   judge_model: string | null;
+  agent?: AgentConfig;
+}
+
+export interface AgentConfig {
+  max_rounds: number;
+  max_tokens: number;
 }
 
 export interface Preset { name: string; description: string }
@@ -188,7 +194,7 @@ export interface AgentEvent {
 }
 
 export async function runAgent(
-  body: { objective: string; max_rounds?: number },
+  body: { objective: string; max_rounds?: number; max_tokens?: number },
   onEvent: (ev: AgentEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, type Settings as SettingsT } from "../api";
+import { api, type AgentConfig, type Settings as SettingsT } from "../api";
+import { AgentConfigDrawer, DEFAULT_AGENT_CONFIG, normalizeAgentConfig } from "./AgentConfigDrawer";
 
 export function Settings({ onSaved }: { onSaved?: () => void }) {
   const [s, setS] = useState<SettingsT | null>(null);
@@ -9,6 +10,8 @@ export function Settings({ onSaved }: { onSaved?: () => void }) {
   const [attackerProfile, setAttackerProfile] = useState("");
   const [attackerModel, setAttackerModel] = useState("");
   const [judgeModel, setJudgeModel] = useState("");
+  const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_AGENT_CONFIG);
+  const [agentStatus, setAgentStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -21,6 +24,7 @@ export function Settings({ onSaved }: { onSaved?: () => void }) {
       setAttackerProfile(v.default_profile ?? "");
       setAttackerModel(v.attacker_model ?? "");
       setJudgeModel(v.judge_model ?? "");
+      setAgentConfig(normalizeAgentConfig(v.agent));
       setTargetProfile("");
     }).catch((e) => setErr((e as Error).message));
   }
@@ -31,13 +35,25 @@ export function Settings({ onSaved }: { onSaved?: () => void }) {
     try {
       const v = await api.saveSettings(body);
       setS(v);
+      setAgentConfig(normalizeAgentConfig(v.agent));
       setMsg("saved");
       onSaved?.();
       setTimeout(() => setMsg(""), 1800);
+      return v;
     } catch (e) {
       setErr((e as Error).message);
+      return null;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveAgentConfig() {
+    setAgentStatus("");
+    const saved = await save({ agent: agentConfig });
+    if (saved) {
+      setAgentStatus("saved");
+      setTimeout(() => setAgentStatus(""), 1600);
     }
   }
 
@@ -105,6 +121,14 @@ export function Settings({ onSaved }: { onSaved?: () => void }) {
           {msg && <span style={{ color: "var(--good)", marginLeft: 12 }}>✓ {msg}</span>}
           {err && <span className="err" style={{ marginLeft: 12 }}>{err}</span>}
         </div>
+        <AgentConfigDrawer
+          value={agentConfig}
+          onChange={setAgentConfig}
+          disabled={busy}
+          onSave={saveAgentConfig}
+          saving={busy}
+          status={agentStatus}
+        />
       </div>
 
       <div className="card" style={{ gridColumn: "1 / -1" }}>

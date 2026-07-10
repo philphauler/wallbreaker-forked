@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
-import { runAgent, verdictKind, type AgentEvent } from "../api";
+import { useEffect, useRef, useState } from "react";
+import { api, runAgent, verdictKind, type AgentConfig, type AgentEvent } from "../api";
+import { AgentConfigDrawer, DEFAULT_AGENT_CONFIG, normalizeAgentConfig } from "./AgentConfigDrawer";
 
 type Item =
   | { kind: "text"; text: string }
@@ -18,12 +19,20 @@ const DONE_KIND: Record<string, "bypass" | "held" | "neutral"> = {
 
 export function Agent({ hasTarget }: { hasTarget: boolean }) {
   const [objective, setObjective] = useState("");
-  const [rounds, setRounds] = useState(8);
+  const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_AGENT_CONFIG);
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [configStatus, setConfigStatus] = useState("");
   const [err, setErr] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    api.settings()
+      .then((settings) => setAgentConfig(normalizeAgentConfig(settings.agent)))
+      .catch(() => {});
+  }, []);
 
   function push(it: Item) {
     setItems((prev) => {
@@ -60,7 +69,7 @@ export function Agent({ hasTarget }: { hasTarget: boolean }) {
     const ac = new AbortController();
     abortRef.current = ac;
     try {
-      await runAgent({ objective, max_rounds: rounds }, onEvent, ac.signal);
+      await runAgent({ objective, ...agentConfig }, onEvent, ac.signal);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setErr((e as Error).message);
     } finally {
@@ -72,6 +81,21 @@ export function Agent({ hasTarget }: { hasTarget: boolean }) {
   function stop() {
     abortRef.current?.abort();
     setRunning(false);
+  }
+
+  async function saveAgentConfig() {
+    setSavingConfig(true);
+    setConfigStatus("");
+    try {
+      const saved = await api.saveSettings({ agent: agentConfig });
+      setAgentConfig(normalizeAgentConfig(saved.agent));
+      setConfigStatus("saved");
+      window.setTimeout(() => setConfigStatus(""), 1600);
+    } catch (e) {
+      setConfigStatus((e as Error).message);
+    } finally {
+      setSavingConfig(false);
+    }
   }
 
   return (
@@ -86,10 +110,15 @@ export function Agent({ hasTarget }: { hasTarget: boolean }) {
           onChange={(e) => setObjective(e.target.value)}
           disabled={running}
         />
+        <AgentConfigDrawer
+          value={agentConfig}
+          onChange={setAgentConfig}
+          disabled={running}
+          onSave={saveAgentConfig}
+          saving={savingConfig}
+          status={configStatus}
+        />
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12 }}>
-          <label className="fld" style={{ margin: 0 }}>rounds</label>
-          <input type="text" style={{ width: 64 }} value={rounds}
-            onChange={(e) => setRounds(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))} disabled={running} />
           {!running ? (
             <button className="fire" style={{ marginTop: 0, width: "auto", padding: "10px 26px" }}
               disabled={!hasTarget || !objective.trim()} onClick={run}>▸ RUN AGENT</button>

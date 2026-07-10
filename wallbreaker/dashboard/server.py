@@ -368,6 +368,32 @@ def _list_arg(value) -> list[str]:
     return [str(item).strip() for item in items if str(item).strip()]
 
 
+def _int_setting(value, default: int, lo: int, hi: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(lo, min(parsed, hi))
+
+
+def _agent_settings(prefs: dict | None = None) -> dict:
+    prefs = prefs or {}
+    return {
+        "max_rounds": _int_setting(
+            prefs.get("agent_max_rounds", prefs.get("rounds")),
+            8,
+            1,
+            50,
+        ),
+        "max_tokens": _int_setting(
+            prefs.get("agent_max_tokens"),
+            8192,
+            256,
+            32000,
+        ),
+    }
+
+
 def _compose_attack_payload(body: dict) -> dict:
     request = str(body.get("request") or body.get("prompt") or "").strip()
     preset_name = str(body.get("preset") or "").strip()
@@ -448,10 +474,11 @@ def _apply_settings(config, prefs: dict) -> None:
             config.judge = dataclasses.replace(config.profile(), name="judge", model=jm)
 
 
-def _settings_view(config) -> dict:
+def _settings_view(config, prefs: dict | None = None) -> dict:
+    agent = _agent_settings(prefs)
     if config is None:
         return {"profiles": [], "default_profile": None, "attacker_model": None,
-                "target": None, "judge_model": None}
+                "target": None, "judge_model": None, "agent": agent}
     attacker_model = None
     if config.profiles:
         try:
@@ -473,6 +500,7 @@ def _settings_view(config) -> dict:
         "attacker_model": attacker_model,
         "target": target,
         "judge_model": getattr(judge, "model", None) if judge else None,
+        "agent": agent,
     }
 
 
@@ -515,7 +543,15 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
     @app.get("/api/settings")
     def settings_get():
-        return _settings_view(config)
+        prefs = {}
+        if config is not None:
+            try:
+                from ..state import load_state, state_path_for
+
+                prefs = load_state(state_path_for(config))
+            except Exception:
+                prefs = {}
+        return _settings_view(config, prefs)
 
     @app.post("/api/settings")
     def settings_post(body: dict):
@@ -553,10 +589,19 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             prefs["attacker_model"] = str(body["attacker_model"])
         if body.get("judge_model"):
             prefs["judge_model"] = str(body["judge_model"])
+        agent = body.get("agent") if isinstance(body.get("agent"), dict) else body
+        if "agent_max_rounds" in agent:
+            prefs["agent_max_rounds"] = _int_setting(agent.get("agent_max_rounds"), 8, 1, 50)
+        if "max_rounds" in agent:
+            prefs["agent_max_rounds"] = _int_setting(agent.get("max_rounds"), 8, 1, 50)
+        if "agent_max_tokens" in agent:
+            prefs["agent_max_tokens"] = _int_setting(agent.get("agent_max_tokens"), 8192, 256, 32000)
+        if "max_tokens" in agent:
+            prefs["agent_max_tokens"] = _int_setting(agent.get("max_tokens"), 8192, 256, 32000)
 
         save_state(state_path_for(config), prefs)
         _apply_settings(config, prefs)
-        return _settings_view(config)
+        return _settings_view(config, prefs)
 
     @app.get("/api/overview")
     def overview():
@@ -763,7 +808,16 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             raise HTTPException(status_code=400, detail="'objective' is required")
         if agent_lock.locked():
             raise HTTPException(status_code=409, detail="an agent run is already in progress")
-        max_rounds = max(1, min(int(body.get("max_rounds", 8)), 20))
+        prefs = {}
+        try:
+            from ..state import load_state, state_path_for
+
+            prefs = load_state(state_path_for(config))
+        except Exception:
+            prefs = {}
+        agent_defaults = _agent_settings(prefs)
+        max_rounds = _int_setting(body.get("max_rounds"), agent_defaults["max_rounds"], 1, 50)
+        max_tokens = _int_setting(body.get("max_tokens"), agent_defaults["max_tokens"], 256, 32000)
 
         from ..agent.loop import AgentEvents, run_autonomous
         from ..agent.messages import user
@@ -775,7 +829,10 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
         provider = build_provider(brain)
         registry = build_registry(config)
         runlog = RunLog(directory=str(sessions))
-        runlog.set_run_meta(models=run_models_meta(config, attacker=brain))
+        runlog.set_run_meta(
+            models=run_models_meta(config, attacker=brain),
+            agent={"max_rounds": max_rounds, "max_tokens": max_tokens},
+        )
         queue: asyncio.Queue = asyncio.Queue()
 
         def push(ev) -> None:
@@ -808,7 +865,7 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
                 try:
                     res = await run_autonomous(
                         provider, registry, history, system=DEFAULT_SYSTEM,
-                        events=events, max_rounds=max_rounds,
+                        events=events, max_rounds=max_rounds, max_tokens=max_tokens,
                     )
                     data = res.data or {}
                     push({
@@ -824,7 +881,8 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
         async def gen():
             push({"type": "start", "objective": objective, "brain": getattr(brain, "model", ""),
-                  "target": getattr(config.target, "model", "")})
+                  "target": getattr(config.target, "model", ""),
+                  "max_rounds": max_rounds, "max_tokens": max_tokens})
             try:
                 while True:
                     ev = await queue.get()
