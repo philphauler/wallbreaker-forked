@@ -21,6 +21,7 @@ export function Console({ hasTarget }: { hasTarget: boolean }) {
   const [request, setRequest] = useState("");
   const [preset, setPreset] = useState("");
   const [system, setSystem] = useState("");
+  const [maxTokens, setMaxTokens] = useState(1024);
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [draft, setDraft] = useState<ComposeResult | null>(null);
@@ -43,6 +44,7 @@ export function Console({ hasTarget }: { hasTarget: boolean }) {
       request,
       preset: preset || undefined,
       system: system || undefined,
+      max_tokens: maxTokens,
       transforms: picked.length ? picked : undefined,
     };
   }
@@ -114,6 +116,7 @@ export function Console({ hasTarget }: { hasTarget: boolean }) {
         preset: draft?.preset || preset || undefined,
         transforms: draft?.transforms?.length ? draft.transforms : (picked.length ? picked : undefined),
         system: system || undefined,
+        max_tokens: maxTokens,
       });
       setDraft(out);
       setPayload(out.payload);
@@ -153,6 +156,14 @@ export function Console({ hasTarget }: { hasTarget: boolean }) {
         </div>
         <label className="fld">System prompt (optional)</label>
         <textarea rows={2} value={system} placeholder="optional target system prompt..." onChange={(e) => setSystem(e.target.value)} />
+        <label className="fld">Max tokens</label>
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={maxTokens}
+          onChange={(e) => setMaxTokens(Math.max(1, Number.parseInt(e.target.value || "0", 10) || 1))}
+        />
         <div className="console-actions">
           <button type="button" className="mini-btn console-build" disabled={!canBuild} onClick={compose}>
             {busy === "compose" ? "Building..." : "Build payload"}
