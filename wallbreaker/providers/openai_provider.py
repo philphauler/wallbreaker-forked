@@ -155,6 +155,14 @@ class OpenAIProvider(Provider):
             payload["temperature"] = temperature
         if tools:
             payload["tools"] = _tools_to_wire(tools)
+            # Optional force (e.g. "required" / "auto") — set on the provider instance
+            # or endpoint.tool_choice. Used by autonomous campaigns when a large operator
+            # system prompt makes the model emit prose-only turns.
+            tc = getattr(self, "tool_choice", None) or getattr(
+                self.endpoint, "tool_choice", None
+            )
+            if tc:
+                payload["tool_choice"] = tc
         if getattr(self.endpoint, "reasoning", False):
             # OpenRouter: ask the model to emit its reasoning and include it in the stream.
             payload["reasoning"] = {"enabled": True}

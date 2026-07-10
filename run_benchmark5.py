@@ -266,6 +266,9 @@ async def run_one(
 
     runlog = RunLog(directory=str(sessions_dir), enabled=True)
     provider = build_provider(endpoint, timeout=300.0)
+    # Force a tool call every turn so large operator jailbreaks (legacy / ARCANUM /
+    # eval-frame) cannot strand the campaign in empty prose-only rounds.
+    provider.tool_choice = "required"
     registry = build_registry(cfg, cwd=str(ROOT))
     registry.ctx.progress = lambda m: log(f"[progress] {m}")
     registry.ctx.record = lambda p, r, lbl, rs, t: runlog.verdict(p, r, lbl, rs, t)
