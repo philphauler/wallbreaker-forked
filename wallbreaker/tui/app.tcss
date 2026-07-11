@@ -52,7 +52,7 @@ Screen {
     dock: bottom;
     max-height: 10;
     overflow-y: auto;
-    border: round $primary;
+    border: heavy $primary;
     border-title-color: $accent;
     background: $surface;
     color: $text-muted;
@@ -67,13 +67,14 @@ Screen {
 
 #prompt {
     dock: bottom;
-    border: round $primary;
+    border: heavy $primary;
+    border-title-color: $secondary;
     background: $surface;
     padding: 0 1;
     margin: 0 1 1 1;
 }
 
 #prompt:focus {
-    border: round $accent;
+    border: heavy $accent;
     background: $panel;
 }

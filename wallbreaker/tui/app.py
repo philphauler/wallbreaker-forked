@@ -109,7 +109,7 @@ from .header import StatusHeader
 from .sidebar import StatsPanel
 from .theme import WB_THEME
 
-HELP_TEXT = """Slash commands:
+HELP_TEXT = """☠ RTFM // TEH SL45H K0MM4NDZ, D00D ☠
 /help [topic]         show this help, or only lines matching a topic
 /edit [new text]      rewind to your last message; prefill it to edit, or
                       pass new text to replace and resend it
@@ -332,7 +332,7 @@ class RthApp(App):
             yield VerticalScroll(id="log")
             yield StatsPanel(id="sidebar")
         yield Static("", id="compose-preview", classes="hidden")
-        yield PromptInput(placeholder="message, /help — paste multi-line, ctrl+j adds a line", id="prompt")
+        yield PromptInput(placeholder="TYP3 UR H4X, D00D  ▪  /help = RTFM  ▪  ctrl+j = m04R L1N3Z", id="prompt")
         yield Footer()
 
     def action_toggle_sidebar(self) -> None:
@@ -747,7 +747,7 @@ class RthApp(App):
         self._assistant = None
         self._round_label = f"{rnd}/{total}"
         self._refresh_status()
-        self._mount(widgets.info_panel(f"round {rnd}/{total}", title="autonomous"))
+        self._mount(widgets.info_panel(f"R0UND {rnd}/{total}", title="G0D M0D3"))
 
     def _handle_auto_result(self, result) -> None:
         if result.status == "finished":
