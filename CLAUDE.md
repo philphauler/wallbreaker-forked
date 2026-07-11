@@ -501,3 +501,18 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   and burns reasoning budget). The stuck categories need MULTI-TURN (Crescendo/Echo Chamber,
   harness has crescendo/goat/tree_attack) seeded by the static frame. Measure with samples>=3 at
   temp 1.0 — samples=1 flickers and reads as noise (3/8 one shot collapsed to 2/8 robust).
+- **[gemlib]**: `library/` is GITIGNORED (".gitignore: library/  # fetched-at-runtime jailbreak
+  corpora, not redistributed") — NOTHING under it is committed (ENI/L1B3RT4S/system_prompts/
+  ZetaLib/UltraBr3aks all live only locally). So "add a corpus to the harness" = commit the CODE
+  that fetches+reads it, NOT the files. A new PUBLIC corpus needs clone-on-demand like l1b3rt4s
+  (`REPO_URLS` + `_clone_sync` + async `ensure_present` called from the tool handlers), or a fresh
+  checkout resolves the corpus to nothing and the wiring is dead. `tools/gemlib.py` is the shared
+  reader for the ZetaLib (Exocija) + UltraBr3aks (SlowLow999) corpora — data-driven CORPORA config
+  (dir/extensions/seed_roots/skip_dirs/skip_stems), registers zetalib_/ultrabreaks_ list/search/get
+  (cross-provider, seeds transfer across targets), and exposes `find_any(name)` which `fire_file.
+  _read_source` consults AFTER eni/l1b3rt4s so a bare name fires them verbatim. The vendored dirs
+  have no `.git` (rsync'd, not cloned) so `ensure_present` no-ops when files are already there and
+  only clones when the dir is truly absent — tests stay offline because the seeds are present.
+  ZetaLib/UltraBr3aks leaked System Prompts were also merged into `library/system_prompts/<Vendor>/`
+  as `.md` (the reader only rglobs `*.md`) with `_VENDOR_HINTS` extended (deepseek/kimi/moonshot/
+  cluely) so `match_target` mirrors them; collisions get a `-zetalib` suffix, never an overwrite.
