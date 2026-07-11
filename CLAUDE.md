@@ -12,6 +12,32 @@ Red-team harness: configurable agentic LLM terminal with Parseltongue + L1B3RT4S
   with `lossy` flags.
 
 ## Lessons Learned
+- **[cost/cache]**: the agentic loop (`agent/loop.py run_turn`) re-sends the WHOLE `history`
+  to `provider.stream()` every round with no compaction, so per-round input grows linearly and
+  total input cost over N rounds is O(N^2). The static prefix alone is huge — `DEFAULT_SYSTEM`
+  ~10.9K tokens + 93 tool specs ~27K tokens = ~38K tokens re-billed EVERY round (~3.8M tokens
+  over 100 rounds before any conversation). Fix (zero perf impact, billing-only): Anthropic
+  prompt caching via `cache_control` breakpoints — `AnthropicProvider` marks the system block,
+  the last tool spec, and a 2-deep rolling tail of the conversation (`_mark_history_cache`),
+  gated on `Endpoint.cache` (default True). HARD LIMIT: Anthropic allows max 4 cache_control
+  breakpoints/request; the layout is exactly system(1)+tools(1)+history(2)=4, so do NOT add a
+  5th (e.g. a 3rd history breakpoint) or the API 400s. In `system_mode="merge"` the system is
+  folded into messages (no separate system breakpoint) so it stays under 4. Cache-read tokens
+  bill ~0.1x, cache-write ~1.25x, output is byte-identical. `UsageEvent` now carries
+  `cache_read_tokens`/`cache_write_tokens`, and Anthropic emits an input-token UsageEvent at
+  `message_start` (it previously reported output only — `tokens_in` was stuck at 0 for Anthropic
+  brains). Native OpenAI/OpenRouter auto-cache stable prefixes, so no wire change there. Below
+  the model's min cacheable length (~1024 tok) a breakpoint is silently ignored, not an error.
+- **[cli]**: `cli.py` is itself inside the `wallbreaker` package (a sibling of `session.py`,
+  `agent/`, `tools/`), so its own internal imports must be single-dot (`from .session import
+  RunLog`), never `from ..session import RunLog` — the double-dot goes up past the package
+  root and raises `ImportError: attempted relative import beyond top-level package`. This bit
+  `_one_shot` right after the "save every tool call + CoT to the run log" commit added the
+  `RunLog` import, breaking every one-shot/`--auto` CLI invocation (`wallbreaker "<prompt>"`
+  and `wallbreaker --auto ...`) while the TUI path (which imports `session` differently) stayed
+  fine — masking the bug until someone actually ran the CLI one-shot path. Test via
+  `python -m wallbreaker --profile <p> --auto --rounds 1 "<prompt>"` after touching any import
+  in `cli.py`, not just `pytest` (unit tests mock around the CLI entrypoint and didn't catch it).
 - **[tui]**: `PromptInput` (an `Input`, single-line) already BUFFERS every line of a multi-line
   paste (`_on_paste` splits, keeps the last line editable, stashes the rest in `.buffer`, submits
   the whole block via `full_text()`), so "paste only keeps one line" was never a data-loss bug —

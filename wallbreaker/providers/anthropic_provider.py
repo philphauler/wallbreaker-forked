@@ -21,9 +21,11 @@ from .base import Provider, ProviderError, parse_tool_args
 
 ANTHROPIC_VERSION = "2023-06-01"
 
+_CACHE_CONTROL = {"type": "ephemeral"}
 
-def _tools_to_wire(tools: list[dict]) -> list[dict]:
-    return [
+
+def _tools_to_wire(tools: list[dict], cache: bool = False) -> list[dict]:
+    wire = [
         {
             "name": t["name"],
             "description": t.get("description", ""),
@@ -31,6 +33,31 @@ def _tools_to_wire(tools: list[dict]) -> list[dict]:
         }
         for t in tools
     ]
+    # One cache_control on the LAST tool marks the whole tools array as a cacheable prefix
+    # segment (Anthropic processes tools before system before messages). The 93-tool spec is
+    # ~27K static tokens - caching it turns that into a ~0.1x re-read every subsequent round.
+    if cache and wire:
+        wire[-1] = {**wire[-1], "cache_control": _CACHE_CONTROL}
+    return wire
+
+
+def _mark_history_cache(wire: list[dict], breakpoints: int = 2) -> None:
+    """Add rolling cache_control breakpoints to the tail of the conversation in place.
+
+    Marks the last content block of the last N messages. Each breakpoint makes everything
+    BEFORE it a cacheable prefix, so the next round (same prefix + one more turn appended)
+    re-reads the whole prior conversation from cache at ~0.1x instead of re-billing the full
+    O(n) history. Two breakpoints give resilience: even if the very last one just missed the
+    5-min TTL, the earlier one still covers most of the transcript.
+    """
+    marked = 0
+    for entry in reversed(wire):
+        if marked >= breakpoints:
+            break
+        content = entry.get("content")
+        if isinstance(content, list) and content:
+            content[-1] = {**content[-1], "cache_control": _CACHE_CONTROL}
+            marked += 1
 
 
 def _messages_to_wire(messages: list[Message], merge_system: str | None = None) -> list[dict]:
@@ -95,20 +122,33 @@ class AnthropicProvider(Provider):
     ) -> AsyncIterator[StreamEvent]:
         url = f"{self.endpoint.base_url}/v1/messages"
         headers = self._auth_headers()
+        cache = bool(getattr(self.endpoint, "cache", True))
+        if cache:
+            # Harmless on GA models (they cache without it); required by older snapshots.
+            headers["anthropic-beta"] = "prompt-caching-2024-07-31"
         mode = getattr(self.endpoint, "system_mode", "default")
         merge_system = system if (mode == "merge" and system) else None
+        wire_messages = _messages_to_wire(messages, merge_system=merge_system)
+        if cache:
+            _mark_history_cache(wire_messages)
         payload: dict = {
             "model": self.endpoint.model,
-            "messages": _messages_to_wire(messages, merge_system=merge_system),
+            "messages": wire_messages,
             "max_tokens": max_tokens,
             "stream": True,
         }
         if system and mode == "default":
-            payload["system"] = system
+            # As a single cacheable text block, the ~11K static system prompt is re-read at
+            # ~0.1x on every round after the first instead of re-billed in full.
+            payload["system"] = (
+                [{"type": "text", "text": system, "cache_control": _CACHE_CONTROL}]
+                if cache
+                else system
+            )
         if temperature is not None:
             payload["temperature"] = temperature
         if tools:
-            payload["tools"] = _tools_to_wire(tools)
+            payload["tools"] = _tools_to_wire(tools, cache=cache)
             tc = getattr(self, "tool_choice", None) or getattr(
                 self.endpoint, "tool_choice", None
             )
@@ -154,7 +194,19 @@ class AnthropicProvider(Provider):
                         except json.JSONDecodeError:
                             continue
                         etype = event.get("type")
-                        if etype == "content_block_start":
+                        if etype == "message_start":
+                            usage = (event.get("message") or {}).get("usage") or {}
+                            if usage:
+                                yield UsageEvent(
+                                    input_tokens=usage.get("input_tokens", 0),
+                                    cache_read_tokens=usage.get(
+                                        "cache_read_input_tokens", 0
+                                    ),
+                                    cache_write_tokens=usage.get(
+                                        "cache_creation_input_tokens", 0
+                                    ),
+                                )
+                        elif etype == "content_block_start":
                             idx = event["index"]
                             block = event.get("content_block", {})
                             if block.get("type") == "tool_use":

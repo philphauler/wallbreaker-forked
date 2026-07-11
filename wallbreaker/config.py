@@ -72,6 +72,11 @@ class Endpoint:
     # unset, the swarm resolves library/jailbreaks/<model-id>.md by convention. Lets a
     # profile pin a version-specific file (e.g. jb/openai/gpt-5.6-sol.md).
     jailbreak_file: str = ""
+    # prompt caching (Anthropic-protocol): mark the static system prompt + tool specs and a
+    # rolling tail of the conversation with cache_control so repeated agentic rounds re-read
+    # the unchanging prefix at ~0.1x instead of full price. Byte-identical outputs; billing
+    # only. Default on - this harness runs long multi-round engagements where it always wins.
+    cache: bool = True
 
     def resolved_key(self) -> str:
         if self.api_key:
@@ -249,6 +254,7 @@ def _endpoint_from_table(name: str, table: dict) -> Endpoint:
         system_prompt_file=str(table.get("system_prompt_file", "")),
         auth_style=str(table.get("auth_style", "x-api-key")).lower(),
         jailbreak_file=str(table.get("jailbreak_file", "")),
+        cache=bool(table.get("cache", True)),
     )
 
 

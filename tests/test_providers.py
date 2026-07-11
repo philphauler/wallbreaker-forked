@@ -96,3 +96,44 @@ def test_supports_native_prefill_flag():
     ant = build_provider(Endpoint("b", "anthropic", "http://y", "m"))
     assert getattr(oai, "supports_native_prefill", None) is False
     assert getattr(ant, "supports_native_prefill", None) is True
+
+
+def test_anthropic_tools_cache_control_on_last_only():
+    two = TOOLS + [{"name": "finish", "description": "done", "parameters": {"type": "object"}}]
+    plain = ant_tools(two, cache=False)
+    assert all("cache_control" not in t for t in plain)
+    cached = ant_tools(two, cache=True)
+    assert "cache_control" not in cached[0]
+    assert cached[-1]["cache_control"] == {"type": "ephemeral"}
+    # tool payload itself is untouched apart from the marker
+    assert cached[-1]["name"] == "finish"
+
+
+def test_anthropic_history_cache_breakpoints_on_tail():
+    from wallbreaker.providers.anthropic_provider import _mark_history_cache
+
+    wire = ant_msgs(CONVO)
+    _mark_history_cache(wire)
+    # exactly the last two messages' final block get a breakpoint (max 2)
+    marked = [
+        m for m in wire
+        if isinstance(m.get("content"), list)
+        and m["content"]
+        and m["content"][-1].get("cache_control") == {"type": "ephemeral"}
+    ]
+    assert len(marked) == 2
+    assert marked[-1] is wire[-1] or marked[0] is wire[-1]
+    # earlier blocks in a multi-block message are NOT marked
+    assistant = next(m for m in wire if m["role"] == "assistant")
+    if len(assistant["content"]) > 1:
+        assert "cache_control" not in assistant["content"][0]
+
+
+def test_endpoint_cache_defaults_on_and_parses():
+    assert Endpoint("a", "anthropic", "http://x", "m").cache is True
+    from wallbreaker.config import _endpoint_from_table
+
+    off = _endpoint_from_table(
+        "p", {"model": "m", "protocol": "anthropic", "base_url": "http://x", "cache": False}
+    )
+    assert off.cache is False
