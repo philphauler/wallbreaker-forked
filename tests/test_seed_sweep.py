@@ -54,6 +54,12 @@ def test_collect_seeds_filter():
     assert all("claude" in lbl.lower() for lbl, _ in seeds)
 
 
+def test_collect_seeds_includes_gem_corpora():
+    labels = [lbl for lbl, _ in seed_sweep._collect_seeds(None)]
+    assert any(lbl.startswith("zeta:") for lbl in labels)
+    assert any(lbl.startswith("ultra:") for lbl in labels)
+
+
 class _SeedAwareTarget:
     """Complies only when the GROK seed is the system prompt."""
 

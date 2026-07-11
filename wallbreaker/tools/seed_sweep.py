@@ -16,14 +16,17 @@ _SEED_REWARD = {"COMPLIED": 1.0, "PARTIAL": 0.6, "EMPTY": 0.0, "REFUSED": 0.0}
 
 
 def _collect_seeds(names: list[str] | None, max_chars: int = MAX_SEED_CHARS) -> list[tuple[str, str]]:
-    """Return [(label, seed_text)] from the ENI + L1B3RT4S collections (ENI first)."""
-    from . import eni, l1b3rt4s
+    """Return [(label, seed_text)] from the ENI + L1B3RT4S + ZetaLib + UltraBr3aks collections."""
+    from . import eni, gemlib, l1b3rt4s
 
     sources = []
     if eni.is_present():
         sources += [(f"eni:{p.stem}", p) for p in sorted(eni.library_dir().glob("*.md"))]
     if l1b3rt4s.is_cloned():
         sources += [(f"lib:{p.stem}", p) for p in l1b3rt4s.seed_files()]
+    for corpus, tag in (("zetalib", "zeta"), ("ultrabreaks", "ultra")):
+        if gemlib.is_present(corpus):
+            sources += [(f"{tag}:{p.stem}", p) for p in gemlib.seed_files(corpus)]
 
     if names:
         wanted = [n.strip().lower() for n in names]
@@ -50,7 +53,8 @@ async def _seed_sweep(args: dict, ctx: ToolContext) -> str:
     if not seeds:
         return (
             "No seeds available. The ENI collection lives in library/ENI; run "
-            "'wallbreaker lib update' to fetch L1B3RT4S. Or pass explicit 'seeds' names."
+            "'wallbreaker lib update' to fetch L1B3RT4S. ZetaLib/UltraBr3aks auto-fetch "
+            "on first zetalib_get/ultrabreaks_get call. Or pass explicit 'seeds' names."
         )
     n = int(args.get("n", 6))
     as_system = bool(args.get("as_system", True))
@@ -140,8 +144,8 @@ def register(registry: ToolRegistry) -> None:
         name="seed_sweep",
         description=(
             "Find which jailbreak SEED cracks the target: inject one request into multiple "
-            "L1B3RT4S + ENI seeds at once (cross-provider - a GROK or ANTHROPIC seed may "
-            "beat a Chinese/local target) and rank which bypassed. Each seed is applied as "
+            "ENI + L1B3RT4S + ZetaLib + UltraBr3aks seeds at once (cross-provider - a GROK or "
+            "ANTHROPIC seed may beat a Chinese/local target) and rank which bypassed. Each seed is applied as "
             "the target's system prompt by default (as_system=false prepends it instead). "
             "Like multi_fire, but sweeping persona/jailbreak seeds rather than encodings. "
             "'seeds' filters by name (e.g. ['grok','anthropic']); omit to sample broadly."
