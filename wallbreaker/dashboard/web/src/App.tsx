@@ -10,14 +10,14 @@ import { Settings } from "./components/Settings";
 
 type Tab = "agent" | "overview" | "console" | "findings" | "runs" | "arsenal" | "settings";
 
-const NAV: { id: Tab; label: string }[] = [
-  { id: "agent", label: "Agent" },
-  { id: "overview", label: "Overview" },
-  { id: "console", label: "Attack console" },
-  { id: "findings", label: "Findings" },
-  { id: "runs", label: "Run logs" },
-  { id: "arsenal", label: "Arsenal" },
-  { id: "settings", label: "Settings" },
+const NAV: { id: Tab; label: string; short: string }[] = [
+  { id: "agent", label: "Agent", short: "AG" },
+  { id: "overview", label: "Overview", short: "OV" },
+  { id: "console", label: "Attack console", short: "AC" },
+  { id: "findings", label: "Findings", short: "FN" },
+  { id: "runs", label: "Run logs", short: "RL" },
+  { id: "arsenal", label: "Arsenal", short: "AR" },
+  { id: "settings", label: "Settings", short: "ST" },
 ];
 
 function tabFromHash(): Tab {
@@ -27,6 +27,9 @@ function tabFromHash(): Tab {
 
 export function App() {
   const [tab, setTabState] = useState<Tab>(tabFromHash());
+  const [railCollapsed, setRailCollapsed] = useState(
+    () => window.localStorage.getItem("wallbreaker.railCollapsed") === "true",
+  );
   const setTab = (t: Tab) => { setTabState(t); window.location.hash = t; };
   const [cfg, setCfg] = useState<ConfigInfo | null>(null);
   const [ov, setOv] = useState<OverviewT | null>(null);
@@ -39,23 +42,43 @@ export function App() {
 
   const asr = ov?.scorecard?.asr;
   const asrStr = typeof asr === "number" ? `${Math.round(asr * 100)}%` : "—";
+  const toggleRail = () => {
+    setRailCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("wallbreaker.railCollapsed", String(next));
+      return next;
+    });
+  };
 
   return (
-    <div className="app">
-      <aside className="rail">
+    <div className={`app ${railCollapsed ? "rail-collapsed" : ""}`}>
+      <aside className="rail" aria-label="Primary navigation">
         <div className="brand">
           <span className="mark">◆</span>
-          <span className="word">WALL<b>BREAKER</b></span>
+          <span className="word">{railCollapsed ? "WB" : <>WALL<b>BREAKER</b></>}</span>
+          <button
+            type="button"
+            className="rail-toggle"
+            onClick={toggleRail}
+            title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!railCollapsed}
+          >
+            {railCollapsed ? "›" : "‹"}
+          </button>
         </div>
         {NAV.map((n) => (
-          <div
+          <button
+            type="button"
             key={n.id}
             className={`nav-item ${tab === n.id ? "active" : ""}`}
             onClick={() => setTab(n.id)}
+            title={railCollapsed ? n.label : undefined}
+            aria-current={tab === n.id ? "page" : undefined}
           >
             <span className="dot" />
-            {n.label}
-          </div>
+            <span className="nav-label">{railCollapsed ? n.short : n.label}</span>
+          </button>
         ))}
         <div className="spacer" />
         <div className="foot">

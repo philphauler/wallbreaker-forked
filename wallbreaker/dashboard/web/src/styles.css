@@ -35,7 +35,13 @@ body.is-resizing-column * {
   user-select: none;
 }
 
-.app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
+.app {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  height: 100vh;
+  transition: grid-template-columns 160ms ease;
+}
+.app.rail-collapsed { grid-template-columns: 72px minmax(0, 1fr); }
 
 /* ---- sidebar ---- */
 .rail {
@@ -45,23 +51,50 @@ body.is-resizing-column * {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
-.brand { display: flex; align-items: baseline; gap: 8px; padding: 4px 8px 14px; }
+.brand { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 4px 14px 8px; }
 .brand .mark { color: var(--brand); font-weight: 800; letter-spacing: 0.5px; }
-.brand .word { font-weight: 800; letter-spacing: 1px; }
+.brand .word { overflow: hidden; font-weight: 800; letter-spacing: 1px; white-space: nowrap; }
 .brand .word b { color: var(--brand); }
+.rail-toggle {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  flex: 0 0 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+.rail-toggle:hover,
+.rail-toggle:focus-visible { border-color: var(--border); background: var(--panel); color: var(--text); outline: none; }
 .nav-item {
   display: flex; align-items: center; gap: 10px;
+  width: 100%;
   padding: 9px 11px; border-radius: 8px; cursor: pointer;
   color: var(--muted); font-weight: 600; border: 1px solid transparent;
+  background: transparent; font-family: inherit; font-size: inherit; text-align: left;
   transition: background 0.12s, color 0.12s;
 }
 .nav-item:hover { background: var(--panel); color: var(--text); }
 .nav-item.active { background: var(--panel-2); color: var(--text); border-color: var(--border); }
 .nav-item.active .dot { background: var(--accent); }
 .nav-item .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+.nav-label { min-width: 0; overflow: hidden; white-space: nowrap; }
 .rail .spacer { flex: 1; }
 .rail .foot { color: var(--dim); font-size: 11px; padding: 8px; line-height: 1.5; }
+.rail-collapsed .rail { padding-inline: 10px; }
+.rail-collapsed .brand { justify-content: center; padding-inline: 0; }
+.rail-collapsed .brand .mark { display: none; }
+.rail-collapsed .brand .word { color: var(--brand); }
+.rail-collapsed .rail-toggle { width: 24px; height: 24px; flex-basis: 24px; }
+.rail-collapsed .nav-item { justify-content: center; gap: 5px; padding-inline: 5px; font-family: var(--mono); font-size: 10px; }
+.rail-collapsed .nav-item .dot { width: 5px; height: 5px; }
+.rail-collapsed .rail .foot { display: none; }
 
 /* ---- topbar ---- */
 .main { display: flex; flex-direction: column; min-width: 0; }
