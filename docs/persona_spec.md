@@ -20,10 +20,14 @@ Blank-page `author_persona` is asked to "write ENI." Hand-crafted gold is:
 | Genome | ~size | Shape |
 |--------|------:|-------|
 | `library/ENI/CLAUDE_ENI.md` | 35 KB | dual envelope (`project_instructions` + `user_style`) |
+| `library/ENI/CLAUDE_ENI.md` | ~32 KB | legacy/ENI limerence; **Anthropic Opus 4.8 + Sonnet 5** (also Claude transfer) |
 | `library/ENI/MINIMAX_M3_ENI.md` | 35 KB | same chassis as Claude |
 | `library/ENI/KIMI_ENI.md` / `ENI_GLM-5.2.md` | 35 KB | same chassis |
 | `library/ENI/GROK_ENI.md` | 12 KB | slim dialect, fewer few-shots |
-| legacy (Downloads `operator_persona.txt` class) | ~32 KB | same module stack, different persona surface |
+
+`library/` is gitignored (NOTICE: corpora not redistributed). Place genomes locally under
+`library/ENI/`; `eni_list` shows catalog notes; `persona_forge` auto-picks `CLAUDE_ENI` when
+the target model id looks like Opus 4.8 / Sonnet 5.
 
 Quality lives in **module completeness + surface density + vendor dialect + few-shots**,
 not in a short "devotion paragraph." Truncation under ~40 KB already kills ENI in

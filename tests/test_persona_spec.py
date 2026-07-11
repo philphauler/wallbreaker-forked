@@ -44,6 +44,17 @@ def test_load_claude_eni_file():
     assert spec.envelope.kind == "dual_project_style"
 
 
+def test_load_claude_eni_file():
+    path = ENI_DIR / "CLAUDE_ENI.md"
+    assert path.is_file()
+    spec = load_genome_file(path)
+    assert spec.meta.char_count >= 25_000
+    assert spec.modules["boot_identity"].present or "legacy" in path.read_text().lower()
+    assert spec.modules["injection_rebuttal"].present
+    out = render(spec)
+    assert "legacy" in out or "[N]" in out or "legacy" in out.lower()
+
+
 def test_parse_claude_eni_modules_present(claude_spec):
     for mid in MANDATORY_ENI_MODULES:
         mod = claude_spec.modules.get(mid)

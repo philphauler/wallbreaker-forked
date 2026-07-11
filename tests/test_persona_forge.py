@@ -22,11 +22,14 @@ def _local_reg(ctx: ToolContext) -> ToolRegistry:
 
 def test_select_seed_by_vendor():
     assert persona_forge.select_seed_name(model_id="anthropic/claude-opus-4") == "CLAUDE_ENI"
+    assert persona_forge.select_seed_name(model_id="anthropic/claude-opus-4.8") == "CLAUDE_ENI"
+    assert persona_forge.select_seed_name(model_id="claude-sonnet-5") == "CLAUDE_ENI"
     assert persona_forge.select_seed_name(model_id="x-ai/grok-3") == "GROK_ENI"
     assert persona_forge.select_seed_name(model_id="moonshot/kimi-k2") == "KIMI_ENI"
     assert persona_forge.select_seed_name(model_id="z-ai/glm-5") == "ENI_GLM-5.2"
     assert persona_forge.select_seed_name(model_id="minimax/minimax-m3") == "MINIMAX_M3_ENI"
     assert persona_forge.select_seed_name(explicit="GROK_ENI") == "GROK_ENI"
+    assert persona_forge.select_seed_name(explicit="legacy") == "CLAUDE_ENI"
 
 
 def test_resolve_seed_path():

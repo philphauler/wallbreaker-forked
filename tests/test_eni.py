@@ -18,11 +18,15 @@ def test_eni_collection_present():
 
 
 def test_eni_find_file_substring():
-    # 'claude' should resolve CLAUDE_ENI, 'glm' should resolve ENI_GLM-5.2
+    # 'claude' should resolve a CLAUDE_* file, 'glm' should resolve ENI_GLM-5.2
     p = eni._find_file("claude")
     assert p is not None and "CLAUDE" in p.stem.upper()
     g = eni._find_file("glm")
     assert g is not None and "GLM" in g.stem.upper()
+    n = eni._find_file("legacy")
+    assert n is not None and n.stem == "CLAUDE_ENI"
+    assert eni._find_file("sonnet5") is not None
+    assert eni._find_file("CLAUDE_ENI").stem == "CLAUDE_ENI"
 
 
 def _reg():
@@ -34,7 +38,9 @@ def _reg():
 
 def test_eni_list_tool():
     res = asyncio.run(_reg().execute("eni_list", {}))
-    assert "ENI model files" in res.content
+    assert "CLAUDE_ENI" in res.content or "ENI" in res.content
+    assert "CLAUDE_ENI" in res.content
+    assert "Opus 4.8" in res.content or "Sonnet 5" in res.content
 
 
 def test_eni_get_requires_model():
@@ -45,6 +51,14 @@ def test_eni_get_requires_model():
 def test_eni_get_fetches_file():
     res = asyncio.run(_reg().execute("eni_get", {"model": "claude"}))
     assert len(res.content) > 200  # real file content
+
+
+def test_eni_get_legacy():
+    res = asyncio.run(_reg().execute("eni_get", {"model": "legacy"}))
+    assert not res.is_error
+    assert "legacy" in res.content or "ENI" in res.content or "legacy" in res.content.lower()
+    assert "CLAUDE_ENI" in res.content or "Anthropic" in res.content
+    assert "SEED" in res.content
 
 
 def test_eni_get_appends_use_hint():
