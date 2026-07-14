@@ -147,7 +147,8 @@ class OpenRouterImageProvider(Provider):
         return payload
 
     async def _post_chat(self, payload: dict) -> dict:
-        url = f"{self.endpoint.base_url}/chat/completions"
+        path = getattr(self.endpoint, "inference_path", "") or "/chat/completions"
+        url = f"{self.endpoint.base_url}{path if path.startswith('/') else '/' + path}"
         headers = {
             "Authorization": f"Bearer {self.endpoint.require_key()}",
             "Content-Type": "application/json",
@@ -159,7 +160,11 @@ class OpenRouterImageProvider(Provider):
                     raise ProviderError(
                         f"HTTP {resp.status_code} from {url}: {resp.text[:400]}"
                     )
-                return resp.json()
+                data = resp.json()
+                from ..model_catalog import record_model_success
+
+                record_model_success(self.endpoint)
+                return data
         except httpx.HTTPError as exc:
             raise ProviderError(f"network error from {url}: {exc!r}") from exc
 
@@ -264,7 +269,8 @@ async def vision_complete(
     The core message types are text-only, so the multimodal body is built here instead
     of widening Message/Block. Used by the image judge to look at a generated picture.
     """
-    url = f"{endpoint.base_url}/chat/completions"
+    path = getattr(endpoint, "inference_path", "") or "/chat/completions"
+    url = f"{endpoint.base_url}{path if path.startswith('/') else '/' + path}"
     headers = {
         "Authorization": f"Bearer {endpoint.require_key()}",
         "Content-Type": "application/json",
@@ -291,7 +297,13 @@ async def vision_complete(
         return ""
     content = (choices[0].get("message") or {}).get("content", "")
     if isinstance(content, list):
-        return "".join(
+        answer = "".join(
             str(p.get("text", "")) for p in content if isinstance(p, dict)
         ).strip()
-    return str(content or "").strip()
+    else:
+        answer = str(content or "").strip()
+    if answer:
+        from ..model_catalog import record_model_success
+
+        record_model_success(endpoint)
+    return answer

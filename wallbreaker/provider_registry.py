@@ -122,6 +122,14 @@ class ProviderRegistry:
                 continue
         if self.config.default_profile not in self.config.profiles and self.config.profiles:
             self.config.default_profile = next(iter(self.config.profiles))
+        self.attach_catalog_context()
+
+    def attach_catalog_context(self) -> None:
+        from .model_catalog import attach_catalog, catalog_path_for
+
+        path = catalog_path_for(self.config)
+        for name, endpoint in self.config.profiles.items():
+            attach_catalog(endpoint, path, name)
 
     def list(self) -> list[dict]:
         doc = self._document()
@@ -131,6 +139,11 @@ class ProviderRegistry:
         for name in sorted(names, key=str.casefold):
             record = overrides.get(name, {}) if isinstance(overrides, dict) else {}
             endpoint = self.config.profiles.get(name) or self.baseline.get(name)
+            if endpoint is None and isinstance(record, dict):
+                try:
+                    endpoint = _normalize(name, record)
+                except ConfigError:
+                    endpoint = None
             if endpoint is None:
                 continue
             item = _endpoint_data(endpoint)
@@ -160,6 +173,7 @@ class ProviderRegistry:
         _write(self.path, doc)
         if record["enabled"]:
             self.config.profiles[name] = endpoint
+            self.attach_catalog_context()
         else:
             self.config.profiles.pop(name, None)
         return self.get(name) or {**record, "name": name}
@@ -182,4 +196,5 @@ class ProviderRegistry:
         doc["providers"].pop(name, None)
         _write(self.path, doc)
         self.config.profiles[name] = dataclasses.replace(self.baseline[name])
+        self.attach_catalog_context()
         return self.get(name) or {}

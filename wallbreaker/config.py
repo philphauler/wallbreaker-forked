@@ -314,7 +314,7 @@ def load_config(path: str | Path | None = None) -> Config:
     if "art" in data:
         art = _endpoint_from_table("art", data["art"])
 
-    return Config(
+    config = Config(
         default_profile=default_profile,
         profiles=profiles,
         target=target,
@@ -323,3 +323,15 @@ def load_config(path: str | Path | None = None) -> Config:
         mcp_servers=_load_mcp_servers(data),
         path=config_path,
     )
+    try:
+        from .model_catalog import attach_catalog, catalog_path_for
+
+        catalog_path = catalog_path_for(config)
+        for name, endpoint in config.profiles.items():
+            attach_catalog(endpoint, catalog_path, name)
+        attach_catalog(config.target, catalog_path, "target")
+        attach_catalog(config.judge, catalog_path, "judge")
+        attach_catalog(config.art, catalog_path, "art")
+    except Exception:
+        pass
+    return config

@@ -669,7 +669,11 @@ def _apply_settings(config, prefs: dict) -> None:
         config.profiles[config.default_profile] = _replace_endpoint(cur, "attacker", prefs)
     judge_profile = prefs.get("judge_profile")
     if isinstance(judge_profile, str) and judge_profile in config.profiles:
-        config.judge = dataclasses.replace(config.profiles[judge_profile], name="judge")
+        source = config.profiles[judge_profile]
+        config.judge = dataclasses.replace(source, name="judge")
+        if hasattr(source, "_catalog_path"):
+            config.judge._catalog_path = source._catalog_path
+            config.judge._provider_id = judge_profile
     jm = prefs.get("judge_model")
     if isinstance(jm, str) and jm:
         if config.judge is not None:
@@ -818,11 +822,17 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
     console_runlog = RunLog(directory=str(sessions))
     provider_registry = None
+    model_catalog = None
     if config is not None:
         try:
             from ..provider_registry import ProviderRegistry
 
             provider_registry = ProviderRegistry(config)
+            from ..model_catalog import ModelCatalog, catalog_path_for
+
+            model_catalog = ModelCatalog(catalog_path_for(config))
+            for provider_id, endpoint in config.profiles.items():
+                model_catalog.upsert(provider_id, endpoint.model, "configured")
             from ..state import load_state, state_path_for
 
             _apply_settings(config, load_state(state_path_for(config)))
@@ -981,7 +991,42 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             raise HTTPException(status_code=400, detail="no config loaded")
         if profile not in config.profiles:
             raise HTTPException(status_code=404, detail=f"unknown profile '{profile}'")
-        return await _discover_profile_models(profile, config.profiles[profile])
+        result = await _discover_profile_models(profile, config.profiles[profile])
+        if model_catalog is not None:
+            if result["fetched"]:
+                model_catalog.sync(profile, result["models"], "remote")
+            entries = model_catalog.list(profile)
+            result["entries"] = entries
+            result["models"] = [entry["model_id"] for entry in entries]
+        return result
+
+    @app.get("/api/providers/{name}/models")
+    def provider_models(name: str):
+        if config is None or name not in config.profiles:
+            raise HTTPException(status_code=404, detail=f"unknown provider '{name}'")
+        entries = model_catalog.list(name) if model_catalog is not None else []
+        return {"provider": name, "models": [item["model_id"] for item in entries], "entries": entries}
+
+    @app.post("/api/providers/{name}/models")
+    def provider_model_add(name: str, body: dict):
+        if config is None or name not in config.profiles:
+            raise HTTPException(status_code=404, detail=f"unknown provider '{name}'")
+        model_id = str(body.get("model") or "").strip()
+        if not model_id:
+            raise HTTPException(status_code=400, detail="model is required")
+        model_catalog.upsert(name, model_id, "manual")
+        return {"provider": name, "model": model_id, "entries": model_catalog.list(name)}
+
+    @app.post("/api/providers/{name}/models/refresh")
+    async def provider_models_refresh(name: str):
+        if config is None or name not in config.profiles:
+            raise HTTPException(status_code=404, detail=f"unknown provider '{name}'")
+        result = await _discover_profile_models(name, config.profiles[name])
+        if result["fetched"]:
+            model_catalog.sync(name, result["models"], "remote")
+        result["entries"] = model_catalog.list(name)
+        result["models"] = [item["model_id"] for item in result["entries"]]
+        return result
 
     @app.post("/api/settings")
     def settings_post(body: dict):

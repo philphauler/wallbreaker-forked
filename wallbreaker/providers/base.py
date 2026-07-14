@@ -150,4 +150,8 @@ class Provider(ABC):
         # response]" TextDelta so complete() isn't blank; don't double-report it here.
         if reasoning and text.startswith("[reasoning-only response]"):
             text = ""
+        if text or reasoning:
+            from ..model_catalog import record_model_success
+
+            record_model_success(self.endpoint)
         return text, reasoning

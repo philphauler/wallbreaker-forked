@@ -41,9 +41,13 @@ def apply_attacker(config, endpoint, prefs: dict):
 def apply_target(config, prefs: dict) -> None:
     target_profile = prefs.get("target_profile")
     if isinstance(target_profile, str) and target_profile in config.profiles:
+        source = config.profiles[target_profile]
         config.target = dataclasses.replace(
-            config.profiles[target_profile], name="target"
+            source, name="target"
         )
+        if hasattr(source, "_catalog_path"):
+            config.target._catalog_path = source._catalog_path
+            config.target._provider_id = target_profile
     target_model = prefs.get("target_model")
     if target_model:
         base = config.target

@@ -130,6 +130,11 @@ async def run_turn(
         for tc in tool_calls:
             content.append(ToolUseBlock(tc.id, tc.name, tc.input))
         assistant_msg = Message(role="assistant", content=content)
+        endpoint = getattr(provider, "endpoint", None)
+        if content and endpoint is not None:
+            from ..model_catalog import record_model_success
+
+            record_model_success(endpoint)
         history.append(assistant_msg)
         last = assistant_msg
         events.on_turn_end(assistant_msg)
