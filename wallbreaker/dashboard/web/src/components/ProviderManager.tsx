@@ -14,6 +14,8 @@ export function ProviderManager({ onChanged }: { onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
   const load = (force = false) => loadProviders(force).then(setProviders).catch((error) => setStatus((error as Error).message));
   useEffect(() => { void load(); }, []);
   const edit = (provider?: ProviderRecord) => {
@@ -38,6 +40,27 @@ export function ProviderManager({ onChanged }: { onChanged: () => void }) {
     catch (error) { setStatus((error as Error).message); }
     finally { setBusy(false); }
   };
+  const testConnection = async (provider: ProviderRecord) => {
+    setTesting(provider.name);
+    setTestResults((current) => ({ ...current, [provider.name]: { ok: true, message: "Testing connection…" } }));
+    try {
+      const result = await api.testProvider(provider.name);
+      if (!result.ok) throw new Error(result.error || "Provider unavailable");
+      const count = result.models.length;
+      setTestResults((current) => ({
+        ...current,
+        [provider.name]: { ok: true, message: `Connected · ${count} model${count === 1 ? "" : "s"} found` },
+      }));
+      invalidateModelCatalog(provider.name);
+    }
+    catch (error) {
+      setTestResults((current) => ({
+        ...current,
+        [provider.name]: { ok: false, message: `Connection failed · ${(error as Error).message}` },
+      }));
+    }
+    finally { setTesting(null); }
+  };
   return <details className="settings-drawer" open>
     <summary><span><b>Provider connections</b><small>Configure API-compatible services and credentials</small></span></summary>
     <div className="drawer-body provider-manager">
@@ -52,12 +75,13 @@ export function ProviderManager({ onChanged }: { onChanged: () => void }) {
           <span className={`status-dot ${provider.enabled ? "live" : ""}`} title={provider.enabled ? "Enabled" : "Disabled"} />
           <div className="row-actions">
             <button type="button" title="Edit provider" onClick={() => edit(provider)}>Edit</button>
-            {provider.enabled && <button type="button" title="Test model catalog" disabled={busy} onClick={() => void act(async () => {
-              const result = await api.testProvider(provider.name); if (!result.ok) throw new Error(result.error || "Provider unavailable");
-            }, "Provider available")}>Test</button>}
-            {provider.can_reset && <button type="button" disabled={busy} onClick={() => void act(() => api.resetProvider(provider.name), "Provider reset")}>Reset</button>}
-            <button type="button" disabled={busy} onClick={() => void act(() => api.deleteProvider(provider.name), provider.source === "config" ? "Provider disabled" : "Provider removed")}>{provider.source === "config" ? "Disable" : "Remove"}</button>
+            {provider.enabled && <button type="button" title="Test provider connection" disabled={busy || testing !== null} onClick={() => void testConnection(provider)}>{testing === provider.name ? "Testing…" : "Test connection"}</button>}
+            {provider.enabled && provider.can_reset && <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.resetProvider(provider.name), "Provider reset")}>Reset</button>}
+            {provider.enabled
+              ? <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.deleteProvider(provider.name), provider.source === "config" ? "Provider disabled" : "Provider removed")}>{provider.source === "config" ? "Disable" : "Remove"}</button>
+              : <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.enableProvider(provider.name), "Provider enabled")}>Enable</button>}
           </div>
+          {testResults[provider.name] && <div className={`connection-result ${testResults[provider.name].ok ? "ok" : "error"}`} role="status" aria-live="polite">{testResults[provider.name].message}</div>}
         </div>)}
       </div>
       {editing && <div className="provider-editor">

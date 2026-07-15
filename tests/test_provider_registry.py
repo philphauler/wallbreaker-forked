@@ -53,6 +53,21 @@ def test_config_provider_can_be_overridden_then_reset(tmp_path):
     assert reset.json()["model"] == "base-model"
 
 
+def test_config_provider_can_be_disabled_then_enabled(tmp_path):
+    cfg = _config(tmp_path)
+    client = TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
+
+    assert client.delete("/api/providers/base").json() == {"ok": True}
+    disabled = next(item for item in client.get("/api/providers").json() if item["name"] == "base")
+    assert disabled["enabled"] is False
+    assert "base" not in cfg.profiles
+
+    enabled = client.put("/api/providers/base", json={"enabled": True})
+    assert enabled.status_code == 200
+    assert enabled.json()["enabled"] is True
+    assert cfg.profiles["base"].model == "base-model"
+
+
 def test_roles_are_independent_and_persisted(tmp_path):
     cfg = _config(tmp_path)
     cfg.profiles["other"] = Endpoint("other", "anthropic", "https://other.example", "other-default")

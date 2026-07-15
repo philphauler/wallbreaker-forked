@@ -718,6 +718,8 @@ textarea:focus, input:focus, select:focus { outline: none; border-color: var(--a
   border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--muted); cursor: pointer; padding: 6px 9px;
 }
 .provider-editor { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 14px; }
+.connection-result { grid-column: 1 / -1; font-family: var(--mono); font-size: 11px; text-align: right; }
+.connection-result.error { color: var(--bad); }
 .editor-heading { margin-bottom: 12px; }
 .editor-heading button { width: 30px; height: 30px; padding: 0; font-size: 18px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }

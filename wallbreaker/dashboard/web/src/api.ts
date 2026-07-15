@@ -268,6 +268,9 @@ export const api = {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }),
   deleteProvider: (name: string) => j<{ ok: boolean }>(`/api/providers/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  enableProvider: (name: string) => j<ProviderRecord>(`/api/providers/${encodeURIComponent(name)}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }),
+  }),
   resetProvider: (name: string) => j<ProviderRecord>(`/api/providers/${encodeURIComponent(name)}/reset`, { method: "POST" }),
   testProvider: (name: string) => j<ModelCatalog & { ok: boolean }>(`/api/providers/${encodeURIComponent(name)}/test`, { method: "POST" }),
   refreshModels: (name: string) => j<ModelCatalog>(`/api/providers/${encodeURIComponent(name)}/models/refresh`, { method: "POST" }),
