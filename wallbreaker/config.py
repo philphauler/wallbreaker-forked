@@ -115,6 +115,12 @@ class Config:
     art: Endpoint | None = None
     mcp_servers: list[MCPServer] = field(default_factory=list)
     path: Path | None = None
+    all_profiles: dict[str, Endpoint] = field(default_factory=dict)
+    disabled_profiles: set[str] = field(default_factory=set)
+
+    def __post_init__(self) -> None:
+        if not self.all_profiles:
+            self.all_profiles = dict(self.profiles)
 
     def profile(self, name: str | None = None) -> Endpoint:
         key = name or self.default_profile
@@ -293,10 +299,18 @@ def load_config(path: str | Path | None = None) -> Config:
     if not profiles_table:
         raise ConfigError(f"No [profiles.*] defined in {config_path}")
 
-    profiles = {
+    all_profiles = {
         name: _endpoint_from_table(name, table)
         for name, table in profiles_table.items()
     }
+    disabled_profiles = {
+        name for name, table in profiles_table.items()
+        if isinstance(table, dict) and table.get("enabled") is False
+    }
+    profiles = {name: endpoint for name, endpoint in all_profiles.items() if name not in disabled_profiles}
+
+    if not profiles:
+        raise ConfigError("At least one [profiles.*] provider must be enabled")
 
     default_profile = data.get("default_profile") or next(iter(profiles))
     if default_profile not in profiles:
@@ -322,6 +336,8 @@ def load_config(path: str | Path | None = None) -> Config:
         art=art,
         mcp_servers=_load_mcp_servers(data),
         path=config_path,
+        all_profiles=all_profiles,
+        disabled_profiles=disabled_profiles,
     )
     try:
         from .model_catalog import attach_catalog, catalog_path_for

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type AdvancedSettings, type AgentConfig, type RoleAssignments, type Settings as SettingsT, type TypicalConfiguration } from "../api";
+import { api, type AdvancedSettings, type AgentConfig, type Settings as SettingsT, type TypicalConfiguration } from "../api";
 import {
   AdvancedSettingsDrawer,
   DEFAULT_ADVANCED_SETTINGS,
@@ -8,7 +8,6 @@ import {
 } from "./AdvancedSettingsDrawer";
 import { AgentConfigDrawer, DEFAULT_AGENT_CONFIG, normalizeAgentConfig } from "./AgentConfigDrawer";
 import { ModelChooser } from "./ModelChooser";
-import { ProviderDiscovery } from "./ProviderDiscovery";
 import { ProviderManager } from "./ProviderManager";
 import { ProviderChooser } from "./ProviderChooser";
 
@@ -38,7 +37,6 @@ export function Settings({ onSaved }: { onSaved?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
-  const [roles, setRoles] = useState<RoleAssignments | null>(null);
 
   function load() {
     api.settings().then((v) => {
@@ -53,7 +51,6 @@ export function Settings({ onSaved }: { onSaved?: () => void }) {
       setTargetProfile(v.target_profile || matchingProfile(v, v.target));
       setJudgeProfile(v.judge_profile || matchingProfile(v, v.advanced?.judge));
     }).catch((e) => setErr((e as Error).message));
-    api.roles().then(setRoles).catch(() => setRoles(null));
   }
   useEffect(load, []);
 
@@ -118,9 +115,6 @@ export function Settings({ onSaved }: { onSaved?: () => void }) {
       <div className="card settings-wide">
         <ProviderManager onChanged={() => { load(); onSaved?.(); }} />
       </div>
-      {roles?.research && <div className="card settings-wide">
-        <ProviderDiscovery research={roles.research} onChanged={() => { load(); onSaved?.(); }} />
-      </div>}
       <div className="card">
         <h3>Target — the model under attack</h3>
         <label className="fld">Provider profile</label>

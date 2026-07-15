@@ -69,18 +69,28 @@ export function ProviderManager({ onChanged }: { onChanged: () => void }) {
         <button type="button" className="primary-command" onClick={() => edit()}>Add provider</button>
         {status && <span className={status.toLowerCase().includes("saved") || status.toLowerCase().includes("available") ? "ok" : "muted"}>{status}</span>}
       </div>
-      <div className="provider-list">
-        {providers.map((provider) => <div className="provider-row" key={provider.name}>
-          <div><b>{provider.name}</b><small>{provider.protocol} · {provider.base_url || "local CLI"}</small></div>
-          <div className="provider-model mono">{provider.model}</div>
-          <span className={`status-dot ${provider.enabled ? "live" : ""}`} title={provider.enabled ? "Enabled" : "Disabled"} />
-          <div className="row-actions">
+      <div className="provider-list" role="table" aria-label="Provider connections">
+        <div className="provider-table-header" role="row">
+          <span role="columnheader">Provider</span>
+          <span role="columnheader">Default model</span>
+          <span role="columnheader">API key variable</span>
+          <span role="columnheader">Status</span>
+          <span role="columnheader">Actions</span>
+        </div>
+        {providers.map((provider) => <div className="provider-row" role="row" key={provider.name}>
+          <div role="cell"><b>{provider.name}</b><small>{provider.protocol} · {provider.base_url || "local CLI"}</small></div>
+          <div role="cell" className="provider-model mono">{provider.model}</div>
+          <div role="cell" className="provider-api mono">{provider.api_key_env || "Not required"}</div>
+          <div role="cell" className="provider-state"><span className={`status-dot ${provider.enabled ? "live" : ""}`} /><span>{provider.enabled ? "Enabled" : "Disabled"}</span></div>
+          <div role="cell" className="row-actions">
             <button type="button" title="Edit provider" onClick={() => edit(provider)}>Edit</button>
             {provider.enabled && <button type="button" title="Test provider connection" disabled={busy || testing !== null} onClick={() => void testConnection(provider)}>{testing === provider.name ? "Testing…" : "Test connection"}</button>}
-            {provider.enabled && provider.can_reset && <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.resetProvider(provider.name), "Provider reset")}>Reset</button>}
             {provider.enabled
-              ? <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.deleteProvider(provider.name), provider.source === "config" ? "Provider disabled" : "Provider removed")}>{provider.source === "config" ? "Disable" : "Remove"}</button>
+              ? <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.disableProvider(provider.name), "Provider disabled")}>Disable</button>
               : <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.enableProvider(provider.name), "Provider enabled")}>Enable</button>}
+            <button type="button" className="remove-provider" disabled={busy || testing !== null} onClick={() => {
+              if (window.confirm(`Remove provider "${provider.name}"?`)) void act(() => api.deleteProvider(provider.name), "Provider removed");
+            }}>Remove</button>
           </div>
           {testResults[provider.name] && <div className={`connection-result ${testResults[provider.name].ok ? "ok" : "error"}`} role="status" aria-live="polite">{testResults[provider.name].message}</div>}
         </div>)}

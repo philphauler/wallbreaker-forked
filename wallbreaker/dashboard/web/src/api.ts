@@ -134,8 +134,6 @@ export interface ModelCatalog {
 
 export interface ProviderRecord extends ProfileDetail {
   enabled: boolean;
-  source: "config" | "override";
-  can_reset: boolean;
   api_key_env: string;
   has_api_key: boolean;
   auth_style: string;
@@ -148,31 +146,9 @@ export interface ProviderRecord extends ProfileDetail {
 export interface RoleChoice {
   provider: string;
   model: string;
-  max_rounds?: number;
-  max_tokens?: number;
 }
 
-export type RoleAssignments = Record<"attacker" | "target" | "judge" | "research", RoleChoice>;
-
-export interface ProviderDraft {
-  id: string;
-  provider_name: string;
-  protocol: string;
-  base_url: string;
-  model: string;
-  api_key_env: string;
-  auth_style: string;
-  inference_path: string;
-  models_path: string;
-  modality: string;
-  response_shape: string;
-  sources: string[];
-  confidence: string;
-  warnings: string[];
-  supported: boolean;
-  status: string;
-  created_at: string;
-}
+export type RoleAssignments = Record<"attacker" | "target" | "judge", RoleChoice>;
 
 export interface AgentConfig {
   max_rounds: number;
@@ -271,7 +247,9 @@ export const api = {
   enableProvider: (name: string) => j<ProviderRecord>(`/api/providers/${encodeURIComponent(name)}`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }),
   }),
-  resetProvider: (name: string) => j<ProviderRecord>(`/api/providers/${encodeURIComponent(name)}/reset`, { method: "POST" }),
+  disableProvider: (name: string) => j<ProviderRecord>(`/api/providers/${encodeURIComponent(name)}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: false }),
+  }),
   testProvider: (name: string) => j<ModelCatalog & { ok: boolean }>(`/api/providers/${encodeURIComponent(name)}/test`, { method: "POST" }),
   refreshModels: (name: string) => j<ModelCatalog>(`/api/providers/${encodeURIComponent(name)}/models/refresh`, { method: "POST" }),
   addModel: (name: string, model: string) => j(`/api/providers/${encodeURIComponent(name)}/models`, {
@@ -281,12 +259,6 @@ export const api = {
   saveRole: (role: keyof RoleAssignments, body: RoleChoice) => j<RoleChoice>(`/api/roles/${role}`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   }),
-  drafts: () => j<ProviderDraft[]>("/api/provider-spec/drafts"),
-  saveDraft: (id: string, body: Partial<ProviderDraft>) => j<ProviderDraft>(`/api/provider-spec/drafts/${id}`, {
-    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  }),
-  applyDraft: (id: string) => j<ProviderRecord>(`/api/provider-spec/drafts/${id}/apply`, { method: "POST" }),
-  discardDraft: (id: string) => j<{ ok: boolean }>(`/api/provider-spec/drafts/${id}`, { method: "DELETE" }),
   saveSettings: (body: Record<string, unknown>) =>
     j<Settings>("/api/settings", {
       method: "POST",
@@ -316,32 +288,6 @@ export const api = {
       body: JSON.stringify(body),
     }),
 };
-
-export async function discoverProvider(
-  body: Record<string, unknown>,
-  onEvent: (event: Record<string, unknown>) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  const response = await fetch("/api/provider-spec/discover", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal,
-  });
-  if (!response.ok || !response.body) throw new Error(response.statusText);
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let split = buffer.indexOf("\n\n");
-    while (split >= 0) {
-      const frame = buffer.slice(0, split).replace(/^data:\s?/, "");
-      buffer = buffer.slice(split + 2);
-      if (frame) onEvent(JSON.parse(frame));
-      split = buffer.indexOf("\n\n");
-    }
-  }
-}
 
 export interface AgentEvent {
   type: "start" | "round" | "text" | "tool_start" | "tool_result" | "progress" | "feedback" | "usage" | "error" | "done";

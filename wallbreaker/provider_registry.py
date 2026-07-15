@@ -4,38 +4,23 @@ import dataclasses
 import json
 import os
 import re
-import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 
 from .config import Config, ConfigError, Endpoint
 
-REGISTRY_FILENAME = ".wallbreaker_providers.json"
+LEGACY_REGISTRY_FILENAME = ".wallbreaker_providers.json"
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _PROTOCOLS = {"openai", "anthropic", "claude-code"}
 _ENDPOINT_FIELDS = tuple(field.name for field in dataclasses.fields(Endpoint))
-
-
-def registry_path_for(config: Config) -> Path:
-    base = config.path.parent if config.path else Path.cwd()
-    return base / REGISTRY_FILENAME
+_TABLE_RE = re.compile(r"(?m)^[ \t]*\[\[?[^\r\n]+?\]\]?[ \t]*(?:#.*)?$")
+_PROFILE_RE = re.compile(
+    r'(?m)^[ \t]*\[profiles\.(?P<name>"(?:[^"\\]|\\.)*"|[A-Za-z0-9_-]+)\][ \t]*(?:#.*)?$'
+)
 
 
 def env_path_for(config: Config) -> Path:
     base = config.path.parent if config.path else Path.cwd()
     return base / ".env"
-
-
-def _read(path: Path) -> dict:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-        return value if isinstance(value, dict) else {}
-    except (OSError, ValueError):
-        return {}
-
-
-def _write(path: Path, value: dict) -> None:
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def _endpoint_data(endpoint: Endpoint) -> dict:
@@ -71,6 +56,7 @@ def _normalize(name: str, body: dict, current: Endpoint | None = None) -> Endpoi
         base_url=base_url,
         model=model,
         api_key_env=str(base.get("api_key_env") or ""),
+        api_key=str(base.get("api_key") or ""),
         provider=provider,
         timeout=float(base.get("timeout") or 0),
         modality=str(base.get("modality") or "text"),
@@ -93,38 +79,118 @@ def _set_env(path: Path, key: str, value: str) -> None:
     os.environ[key] = value
 
 
+def _toml_value(value) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _profile_block(name: str, endpoint: Endpoint, enabled: bool) -> str:
+    values: list[tuple[str, object]] = [
+        ("protocol", endpoint.protocol),
+        ("base_url", endpoint.base_url),
+        ("api_key_env", endpoint.api_key_env),
+        ("model", endpoint.model),
+    ]
+    if endpoint.api_key and not endpoint.api_key_env:
+        values.append(("api_key", endpoint.api_key))
+    if endpoint.provider:
+        values.append(("provider", list(endpoint.provider)))
+    if endpoint.timeout:
+        values.append(("timeout", endpoint.timeout))
+    if endpoint.modality != "text":
+        values.append(("modality", endpoint.modality))
+    if endpoint.reasoning:
+        values.append(("reasoning", True))
+    if endpoint.system_mode != "default":
+        values.append(("system_mode", endpoint.system_mode))
+    if endpoint.system_prompt_file:
+        values.append(("system_prompt_file", endpoint.system_prompt_file))
+    if endpoint.auth_style != "x-api-key":
+        values.append(("auth_style", endpoint.auth_style))
+    if endpoint.inference_path:
+        values.append(("inference_path", endpoint.inference_path))
+    if endpoint.models_path:
+        values.append(("models_path", endpoint.models_path))
+    if not enabled:
+        values.append(("enabled", False))
+    lines = [f"[profiles.{json.dumps(name, ensure_ascii=False)}]"]
+    lines.extend(f"{key} = {_toml_value(value)}" for key, value in values if value != "")
+    return "\n".join(lines) + "\n"
+
+
+def _profile_span(text: str, name: str) -> tuple[int, int] | None:
+    for match in _PROFILE_RE.finditer(text):
+        raw_name = match.group("name")
+        parsed_name = json.loads(raw_name) if raw_name.startswith('"') else raw_name
+        if parsed_name != name:
+            continue
+        next_table = _TABLE_RE.search(text, match.end())
+        return match.start(), next_table.start() if next_table else len(text)
+    return None
+
+
+def _persist_profile(config: Config, name: str, endpoint: Endpoint | None, enabled: bool = True) -> None:
+    if config.path is None:
+        return
+    path = Path(config.path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        text = f"default_profile = {_toml_value(config.default_profile)}\n\n"
+        for existing_name, existing_endpoint in config.all_profiles.items():
+            if existing_name != name:
+                text += _profile_block(
+                    existing_name,
+                    existing_endpoint,
+                    existing_name not in config.disabled_profiles,
+                ) + "\n"
+    span = _profile_span(text, name)
+    block = _profile_block(name, endpoint, enabled) + "\n" if endpoint is not None else ""
+    if span:
+        text = text[:span[0]] + block + text[span[1]:]
+    elif endpoint is not None:
+        text = text.rstrip() + "\n\n" + block
+    default_line = f"default_profile = {_toml_value(config.default_profile)}"
+    if re.search(r"(?m)^default_profile\s*=.*$", text):
+        text = re.sub(r"(?m)^default_profile\s*=.*$", default_line, text, count=1)
+    else:
+        text = default_line + "\n\n" + text.lstrip()
+    path.write_text(text.rstrip() + "\n", encoding="utf-8")
+
+
 class ProviderRegistry:
     def __init__(self, config: Config):
         self.config = config
-        self.path = registry_path_for(config)
         self.env_path = env_path_for(config)
-        self.baseline = {name: dataclasses.replace(ep) for name, ep in config.profiles.items()}
-        self._load_overlays()
-
-    def _document(self) -> dict:
-        data = _read(self.path)
-        data.setdefault("providers", {})
-        data.setdefault("drafts", {})
-        return data
-
-    def _load_overlays(self) -> None:
-        providers = self._document().get("providers", {})
-        if not isinstance(providers, dict):
-            return
-        for name, record in providers.items():
-            if not isinstance(record, dict):
-                continue
-            if record.get("deleted") or record.get("enabled") is False:
-                self.config.profiles.pop(name, None)
-                continue
-            try:
-                current = self.baseline.get(name)
-                self.config.profiles[name] = _normalize(name, record, current)
-            except ConfigError:
-                continue
-        if self.config.default_profile not in self.config.profiles and self.config.profiles:
-            self.config.default_profile = next(iter(self.config.profiles))
+        self._migrate_legacy_registry()
         self.attach_catalog_context()
+
+    def _migrate_legacy_registry(self) -> None:
+        base = self.config.path.parent if self.config.path else Path.cwd()
+        path = base / LEGACY_REGISTRY_FILENAME
+        if not path.is_file():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            providers = data.get("providers", {}) if isinstance(data, dict) else {}
+            if isinstance(providers, dict):
+                for name, record in providers.items():
+                    if not isinstance(record, dict):
+                        continue
+                    try:
+                        if record.get("removed"):
+                            if name in self.config.all_profiles:
+                                self.delete(name)
+                        else:
+                            self.save(name, record)
+                    except (ConfigError, KeyError):
+                        continue
+            path.unlink()
+        except (OSError, ValueError):
+            return
 
     def attach_catalog_context(self) -> None:
         from .model_catalog import attach_catalog, catalog_path_for
@@ -134,27 +200,10 @@ class ProviderRegistry:
             attach_catalog(endpoint, path, name)
 
     def list(self) -> list[dict]:
-        doc = self._document()
-        overrides = doc.get("providers", {})
-        names = set(self.baseline) | set(overrides) | set(self.config.profiles)
         out = []
-        for name in sorted(names, key=str.casefold):
-            record = overrides.get(name, {}) if isinstance(overrides, dict) else {}
-            endpoint = self.config.profiles.get(name) or self.baseline.get(name)
-            if endpoint is None and isinstance(record, dict):
-                try:
-                    endpoint = _normalize(name, record)
-                except ConfigError:
-                    endpoint = None
-            if endpoint is None:
-                continue
+        for name, endpoint in sorted(self.config.all_profiles.items(), key=lambda item: item[0].casefold()):
             item = _endpoint_data(endpoint)
-            item.update({
-                "name": name,
-                "enabled": not bool(record.get("deleted")) and record.get("enabled") is not False,
-                "source": "override" if name in overrides else "config",
-                "can_reset": name in self.baseline and name in overrides,
-            })
+            item.update({"name": name, "enabled": name not in self.config.disabled_profiles})
             out.append(item)
         return out
 
@@ -162,101 +211,35 @@ class ProviderRegistry:
         return next((item for item in self.list() if item["name"] == name), None)
 
     def save(self, name: str, body: dict) -> dict:
-        current = self.config.profiles.get(name) or self.baseline.get(name)
+        current = self.config.all_profiles.get(name)
         endpoint = _normalize(name, body, current)
+        enabled = bool(body.get("enabled", name not in self.config.disabled_profiles))
+        if not enabled and name in self.config.profiles and len(self.config.profiles) == 1:
+            raise ConfigError("At least one provider must remain enabled")
         api_key = str(body.get("api_key") or "")
         if api_key:
             _set_env(self.env_path, endpoint.api_key_env, api_key)
-        doc = self._document()
-        record = _endpoint_data(endpoint)
-        record.pop("has_api_key", None)
-        record["enabled"] = bool(body.get("enabled", True))
-        doc["providers"][name] = record
-        _write(self.path, doc)
-        if record["enabled"]:
+        if enabled:
             self.config.profiles[name] = endpoint
-            self.attach_catalog_context()
+            self.config.disabled_profiles.discard(name)
         else:
             self.config.profiles.pop(name, None)
-        return self.get(name) or {**record, "name": name}
-
-    def delete(self, name: str) -> None:
-        if name not in self.config.profiles and name not in self.baseline:
-            raise KeyError(name)
-        doc = self._document()
-        if name in self.baseline:
-            doc["providers"][name] = {"deleted": True, "enabled": False}
-        else:
-            doc["providers"].pop(name, None)
-        _write(self.path, doc)
-        self.config.profiles.pop(name, None)
-
-    def reset(self, name: str) -> dict:
-        if name not in self.baseline:
-            raise KeyError(name)
-        doc = self._document()
-        doc["providers"].pop(name, None)
-        _write(self.path, doc)
-        self.config.profiles[name] = dataclasses.replace(self.baseline[name])
+            self.config.disabled_profiles.add(name)
+        self.config.all_profiles[name] = endpoint
+        if self.config.default_profile not in self.config.profiles and self.config.profiles:
+            self.config.default_profile = next(iter(self.config.profiles))
+        _persist_profile(self.config, name, endpoint, enabled)
         self.attach_catalog_context()
         return self.get(name) or {}
 
-    def list_drafts(self) -> list[dict]:
-        drafts = self._document().get("drafts", {})
-        if not isinstance(drafts, dict):
-            return []
-        return sorted(
-            (value for value in drafts.values() if isinstance(value, dict)),
-            key=lambda item: str(item.get("created_at", "")),
-            reverse=True,
-        )
-
-    def get_draft(self, draft_id: str) -> dict | None:
-        return next((item for item in self.list_drafts() if item.get("id") == draft_id), None)
-
-    def save_draft(self, draft: dict) -> dict:
-        doc = self._document()
-        draft = dict(draft)
-        draft.setdefault("id", uuid.uuid4().hex)
-        draft.setdefault("created_at", datetime.now(UTC).isoformat(timespec="seconds"))
-        draft["status"] = "draft"
-        doc["drafts"][draft["id"]] = draft
-        _write(self.path, doc)
-        return draft
-
-    def update_draft(self, draft_id: str, updates: dict) -> dict:
-        doc = self._document()
-        current = doc["drafts"].get(draft_id)
-        if not isinstance(current, dict):
-            raise KeyError(draft_id)
-        allowed = {
-            "provider_name", "protocol", "base_url", "model", "api_key_env",
-            "auth_style", "inference_path", "models_path", "modality",
-            "sources", "confidence", "warnings", "supported", "response_shape",
-        }
-        current.update({key: value for key, value in updates.items() if key in allowed})
-        doc["drafts"][draft_id] = current
-        _write(self.path, doc)
-        return current
-
-    def discard_draft(self, draft_id: str) -> None:
-        doc = self._document()
-        if draft_id not in doc["drafts"]:
-            raise KeyError(draft_id)
-        del doc["drafts"][draft_id]
-        _write(self.path, doc)
-
-    def apply_draft(self, draft_id: str) -> dict:
-        draft = self.get_draft(draft_id)
-        if draft is None:
-            raise KeyError(draft_id)
-        if not draft.get("supported", True) or draft.get("protocol") not in _PROTOCOLS:
-            raise ConfigError("This specification requires a custom provider adapter")
-        name = str(draft.get("provider_name") or "").strip()
-        result = self.save(name, draft)
-        doc = self._document()
-        if draft_id in doc["drafts"]:
-            doc["drafts"][draft_id]["status"] = "applied"
-            doc["drafts"][draft_id]["applied_at"] = datetime.now(UTC).isoformat(timespec="seconds")
-            _write(self.path, doc)
-        return result
+    def delete(self, name: str) -> None:
+        if name not in self.config.all_profiles:
+            raise KeyError(name)
+        if name in self.config.profiles and len(self.config.profiles) == 1:
+            raise ConfigError("At least one provider must remain enabled")
+        self.config.all_profiles.pop(name)
+        self.config.profiles.pop(name, None)
+        self.config.disabled_profiles.discard(name)
+        if self.config.default_profile == name and self.config.profiles:
+            self.config.default_profile = next(iter(self.config.profiles))
+        _persist_profile(self.config, name, None)

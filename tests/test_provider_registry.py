@@ -1,11 +1,12 @@
 import json
+import tomllib
 
 import pytest
 
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
-from wallbreaker.config import Config, Endpoint
+from wallbreaker.config import Config, Endpoint, load_config
 from wallbreaker.dashboard.server import create_app
 
 
@@ -31,12 +32,13 @@ def test_provider_crud_redacts_key_and_updates_env(tmp_path):
     })
     assert response.status_code == 200
     assert response.json()["has_api_key"] is True
+    assert response.json()["api_key_env"] == "CUSTOM_API_KEY"
     assert "api_key" not in response.json()
     assert "top-secret" not in client.get("/api/providers").text
     assert "CUSTOM_API_KEY='top-secret'" in (tmp_path / ".env").read_text(encoding="utf-8")
     assert cfg.profiles["custom"].models_path == "/catalog/models"
-    persisted = json.loads((tmp_path / ".wallbreaker_providers.json").read_text())
-    assert persisted["providers"]["custom"]["model"] == "custom-model"
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert persisted["profiles"]["custom"]["model"] == "custom-model"
 
     updated = client.put("/api/providers/custom", json={
         "api_key_env": "CUSTOM_API_KEY",
@@ -49,31 +51,67 @@ def test_provider_crud_redacts_key_and_updates_env(tmp_path):
 
     assert client.delete("/api/providers/custom").json() == {"ok": True}
     assert "custom" not in cfg.profiles
+    assert all(item["name"] != "custom" for item in client.get("/api/providers").json())
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert "custom" not in persisted["profiles"]
 
 
-def test_config_provider_can_be_overridden_then_reset(tmp_path):
+def test_config_provider_can_be_edited_like_any_other_provider(tmp_path):
     cfg = _config(tmp_path)
     client = TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
     changed = client.put("/api/providers/base", json={"model": "override-model"})
     assert changed.json()["model"] == "override-model"
-    assert changed.json()["can_reset"] is True
-    reset = client.post("/api/providers/base/reset")
-    assert reset.status_code == 200
-    assert reset.json()["model"] == "base-model"
+    assert cfg.profiles["base"].model == "override-model"
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert persisted["profiles"]["base"]["model"] == "override-model"
 
 
 def test_config_provider_can_be_disabled_then_enabled(tmp_path):
     cfg = _config(tmp_path)
     client = TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
 
-    assert client.delete("/api/providers/base").json() == {"ok": True}
+    assert client.put("/api/providers/other", json={
+        "protocol": "openai", "base_url": "https://other.example/v1", "model": "other-model",
+    }).status_code == 200
+    disabled_response = client.put("/api/providers/base", json={"enabled": False})
+    assert disabled_response.status_code == 200
     disabled = next(item for item in client.get("/api/providers").json() if item["name"] == "base")
     assert disabled["enabled"] is False
     assert "base" not in cfg.profiles
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert persisted["profiles"]["base"]["enabled"] is False
+    reloaded = load_config(tmp_path / "config.toml")
+    assert "base" not in reloaded.profiles
+    assert reloaded.all_profiles["base"].model == "base-model"
 
     enabled = client.put("/api/providers/base", json={"enabled": True})
     assert enabled.status_code == 200
     assert enabled.json()["enabled"] is True
+    assert cfg.profiles["base"].model == "base-model"
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert "enabled" not in persisted["profiles"]["base"]
+
+
+def test_config_provider_can_be_removed_and_recreated(tmp_path):
+    cfg = _config(tmp_path)
+    client = TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
+
+    added = client.put("/api/providers/other", json={
+        "protocol": "openai", "base_url": "https://other.example/v1", "model": "other-model",
+    })
+    assert added.status_code == 200
+    assert client.delete("/api/providers/base").json() == {"ok": True}
+    assert all(item["name"] != "base" for item in client.get("/api/providers").json())
+    assert "base" not in cfg.profiles
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert "base" not in persisted["profiles"]
+
+    recreated = client.put("/api/providers/base", json={
+        "protocol": "openai", "base_url": "https://base.example/v1",
+        "model": "base-model", "enabled": True,
+    })
+    assert recreated.status_code == 200
+    assert recreated.json()["enabled"] is True
     assert cfg.profiles["base"].model == "base-model"
 
 
@@ -83,16 +121,50 @@ def test_roles_are_independent_and_persisted(tmp_path):
     client = TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
     assert client.put("/api/roles/attacker", json={"provider": "other", "model": "attack-x"}).status_code == 200
     assert client.put("/api/roles/target", json={"provider": "base", "model": "target-x"}).status_code == 200
-    research = client.put("/api/roles/research", json={
-        "provider": "other", "model": "research-x", "max_rounds": 9, "max_tokens": 12000,
-    })
-    assert research.json()["max_rounds"] == 9
     roles = client.get("/api/roles").json()
     assert roles["attacker"] == {"provider": "other", "model": "attack-x"}
     assert roles["target"] == {"provider": "base", "model": "target-x"}
-    assert roles["research"]["model"] == "research-x"
-    state = json.loads((tmp_path / ".wallbreaker_state.json").read_text())
-    assert state["research_profile"] == "other"
+    assert set(roles) == {"attacker", "target", "judge"}
+    assert client.put("/api/roles/research", json={
+        "provider": "other", "model": "unused",
+    }).status_code == 404
+
+
+def test_provider_registry_removes_obsolete_overlay_file(tmp_path):
+    cfg = _config(tmp_path)
+    registry_path = tmp_path / ".wallbreaker_providers.json"
+    registry_path.write_text(json.dumps({
+        "providers": {
+            "migrated": {
+                "protocol": "openai", "base_url": "https://migrated.example/v1",
+                "model": "migrated-model", "api_key_env": "MIGRATED_API_KEY",
+                "enabled": True,
+            },
+        },
+        "drafts": {"old": {"provider_name": "obsolete"}},
+    }), encoding="utf-8")
+
+    from wallbreaker.provider_registry import ProviderRegistry
+
+    ProviderRegistry(cfg)
+    assert not registry_path.exists()
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert persisted["profiles"]["migrated"]["model"] == "migrated-model"
+
+
+def test_dashboard_removes_obsolete_provider_research_state(tmp_path):
+    cfg = _config(tmp_path)
+    state_path = tmp_path / ".wallbreaker_state.json"
+    state_path.write_text(json.dumps({
+        "profile": "base",
+        "research_profile": "base",
+        "research_model": "obsolete-model",
+        "research_agent_max_rounds": 9,
+        "research_agent_max_tokens": 12000,
+    }), encoding="utf-8")
+
+    TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
+    assert json.loads(state_path.read_text(encoding="utf-8")) == {"profile": "base"}
 
 
 def test_provider_validation_and_localhost_cors(tmp_path):
