@@ -79,12 +79,12 @@ export function ProviderManager({ onChanged }: { onChanged: () => void }) {
         </div>
         {providers.map((provider) => <div className="provider-row" role="row" key={provider.name}>
           <div role="cell"><b>{provider.name}</b><small>{provider.protocol} · {provider.base_url || "local CLI"}</small></div>
-          <div role="cell" className="provider-model mono">{provider.model}</div>
+          <div role="cell" className="provider-model mono">{provider.model || "Not set"}</div>
           <div role="cell" className="provider-api mono">{provider.api_key_env || "Not required"}</div>
           <div role="cell" className="provider-state"><span className={`status-dot ${provider.enabled ? "live" : ""}`} /><span>{provider.enabled ? "Enabled" : "Disabled"}</span></div>
           <div role="cell" className="row-actions">
             <button type="button" title="Edit provider" onClick={() => edit(provider)}>Edit</button>
-            {provider.enabled && <button type="button" title="Test provider connection" disabled={busy || testing !== null} onClick={() => void testConnection(provider)}>{testing === provider.name ? "Testing…" : "Test connection"}</button>}
+            <button type="button" title="Test provider connection and fetch available models" disabled={busy || testing !== null} onClick={() => void testConnection(provider)}>{testing === provider.name ? "Testing…" : "Test connection"}</button>
             {provider.enabled
               ? <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.disableProvider(provider.name), "Provider disabled")}>Disable</button>
               : <button type="button" disabled={busy || testing !== null} onClick={() => void act(() => api.enableProvider(provider.name), "Provider enabled")}>Enable</button>}
@@ -101,7 +101,7 @@ export function ProviderManager({ onChanged }: { onChanged: () => void }) {
           <label>Name<input value={String(form.name || "")} onChange={(e) => update("name", e.target.value)} /></label>
           <label>Protocol<select value={String(form.protocol)} onChange={(e) => update("protocol", e.target.value)}><option value="openai">OpenAI compatible</option><option value="anthropic">Anthropic compatible</option><option value="claude-code">Claude Code</option></select></label>
           <label className="wide">Base URL<input value={String(form.base_url || "")} placeholder="https://api.example.com/v1" onChange={(e) => update("base_url", e.target.value)} /></label>
-          <label>Default model<ModelChooser
+          <label>Default model (optional)<ModelChooser
             profile={String(form.name || "")}
             value={String(form.model || "")}
             onChange={(value) => update("model", value)}

@@ -8,7 +8,6 @@ from pathlib import Path
 
 from .config import Config, ConfigError, Endpoint
 
-LEGACY_REGISTRY_FILENAME = ".wallbreaker_providers.json"
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _PROTOCOLS = {"openai", "anthropic", "claude-code"}
 _ENDPOINT_FIELDS = tuple(field.name for field in dataclasses.fields(Endpoint))
@@ -41,8 +40,6 @@ def _normalize(name: str, body: dict, current: Endpoint | None = None) -> Endpoi
         raise ConfigError("protocol must be openai, anthropic, or claude-code")
     model = str(base.get("model") or "").strip()
     base_url = str(base.get("base_url") or "").strip().rstrip("/")
-    if not model:
-        raise ConfigError("model is required")
     if protocol != "claude-code" and not base_url:
         raise ConfigError("base_url is required")
     provider = base.get("provider") or ()
@@ -165,32 +162,7 @@ class ProviderRegistry:
     def __init__(self, config: Config):
         self.config = config
         self.env_path = env_path_for(config)
-        self._migrate_legacy_registry()
         self.attach_catalog_context()
-
-    def _migrate_legacy_registry(self) -> None:
-        base = self.config.path.parent if self.config.path else Path.cwd()
-        path = base / LEGACY_REGISTRY_FILENAME
-        if not path.is_file():
-            return
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            providers = data.get("providers", {}) if isinstance(data, dict) else {}
-            if isinstance(providers, dict):
-                for name, record in providers.items():
-                    if not isinstance(record, dict):
-                        continue
-                    try:
-                        if record.get("removed"):
-                            if name in self.config.all_profiles:
-                                self.delete(name)
-                        else:
-                            self.save(name, record)
-                    except (ConfigError, KeyError):
-                        continue
-            path.unlink()
-        except (OSError, ValueError):
-            return
 
     def attach_catalog_context(self) -> None:
         from .model_catalog import attach_catalog, catalog_path_for

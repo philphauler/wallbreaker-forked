@@ -124,7 +124,9 @@ def test_compose_builds_payload_without_target(tmp_path):
 
 
 def test_fire_records_full_console_attempt(monkeypatch, tmp_path):
+    from wallbreaker.agent.messages import ReasoningDelta, StopEvent, TextDelta, UsageEvent, user
     from wallbreaker.config import Config, Endpoint
+    from wallbreaker.providers.base import Provider
     from wallbreaker.tools.registry import ToolResult
     import wallbreaker.tools as tools_mod
 
@@ -139,11 +141,22 @@ def test_fire_records_full_console_attempt(monkeypatch, tmp_path):
     )
     seen = {}
 
+    class FakeProvider(Provider):
+        async def stream(self, messages, tools=None, system=None, max_tokens=4096, temperature=None):
+            yield ReasoningDelta("full target reasoning")
+            yield TextDelta("[target fake]\nREFUSED: nope")
+            yield UsageEvent(17, 9)
+            yield StopEvent("end_turn")
+
     class FakeRegistry:
         async def execute(self, name, args):
             seen["name"] = name
             seen["args"] = args
-            return ToolResult("[target fake]\nREFUSED: nope")
+            content = await FakeProvider(cfg.target).complete(
+                [user(args["prompt"])], system=args.get("system"),
+                max_tokens=args.get("max_tokens", 1024),
+            )
+            return ToolResult(content)
 
     monkeypatch.setattr(tools_mod, "build_registry", lambda _config: FakeRegistry())
     client = TestClient(create_app(config=cfg, sessions_dir=sessions))
@@ -168,6 +181,103 @@ def test_fire_records_full_console_attempt(monkeypatch, tmp_path):
     assert fired[0]["payload"] == "aGVsbG8="
     assert fired[0]["response"] == "[target fake]\nREFUSED: nope"
     assert fired[0]["target_model"] == "target-model"
+    request = next(record for record in records if record.get("kind") == "inference_request")
+    response = next(record for record in records if record.get("kind") == "inference_response")
+    assert request["messages"][0]["content"][0]["text"] == "hello"
+    assert request["parameters"]["max_tokens"] == 1024
+    assert response["text"] == "[target fake]\nREFUSED: nope"
+    assert response["reasoning"] == "full target reasoning"
+    assert response["usage_events"] == [{"input_tokens": 17, "output_tokens": 9}]
+    assert response["stop_reasons"] == ["end_turn"]
+    streamed = [
+        record["event"] for record in records
+        if record.get("kind") == "inference_event"
+        and record.get("inference_id") == response["inference_id"]
+    ]
+    assert [event["type"] for event in streamed] == [
+        "reasoning_delta", "text_delta", "usage", "stop",
+    ]
+
+
+def test_agent_run_logs_full_scaffold_inference_and_tools(monkeypatch, tmp_path):
+    from wallbreaker.agent.messages import (
+        ReasoningDelta, StopEvent, TextDelta, ToolUseEvent, UsageEvent,
+    )
+    from wallbreaker.config import Config, Endpoint
+    from wallbreaker.providers.base import Provider
+    from wallbreaker.tools.registry import ToolContext, ToolRegistry
+    import wallbreaker.providers.factory as factory_mod
+    import wallbreaker.tools as tools_mod
+
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    attacker = Endpoint("attacker", "openai", "http://attacker", "attack-model")
+    target = Endpoint("target", "openai", "http://target", "target-model")
+    cfg = Config(
+        default_profile="attacker", profiles={"attacker": attacker},
+        target=target, path=tmp_path / "config.toml",
+    )
+
+    class FakeProvider(Provider):
+        async def stream(self, messages, tools=None, system=None, max_tokens=4096, temperature=None):
+            yield ReasoningDelta("private attacker reasoning")
+            yield TextDelta("attacker visible output")
+            yield ToolUseEvent("finish-1", "finish", {"summary": "complete summary text"})
+            yield UsageEvent(101, 37)
+            yield StopEvent("tool_use")
+
+    registry = ToolRegistry(ToolContext(config=cfg))
+
+    async def finish(args, _ctx):
+        return f"finish accepted: {args['summary']}"
+
+    registry.add(
+        "finish", "Finish the autonomous engagement with a complete summary.",
+        {
+            "type": "object",
+            "properties": {"summary": {"type": "string", "description": "Full summary text"}},
+            "required": ["summary"],
+        },
+        finish,
+    )
+    monkeypatch.setattr(factory_mod, "build_provider", lambda _endpoint: FakeProvider(attacker))
+    monkeypatch.setattr(tools_mod, "build_registry", lambda _config: registry)
+
+    client = TestClient(create_app(config=cfg, sessions_dir=sessions))
+    with client.stream("POST", "/api/agent/run", json={
+        "objective": "full objective text", "max_rounds": 1, "max_tokens": 2048,
+    }) as response:
+        assert response.status_code == 200
+        stream_text = "".join(response.iter_text())
+    assert '"type": "done"' in stream_text
+
+    log = next(sessions.glob("run-*.jsonl"))
+    records = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert next(row for row in records if row["kind"] == "run_meta")["source"] == "dashboard_agent"
+    request = next(row for row in records if row["kind"] == "inference_request")
+    response_record = next(row for row in records if row["kind"] == "inference_response")
+    tool_call = next(row for row in records if row["kind"] == "tool_call")
+    tool_result = next(row for row in records if row["kind"] == "tool_result")
+
+    assert request["system"]
+    assert request["messages"][0]["content"][0]["text"] == "full objective text"
+    assert request["tools"][0]["description"].startswith("Finish the autonomous")
+    assert request["parameters"]["max_tokens"] == 2048
+    assert response_record["text"] == "attacker visible output"
+    assert response_record["reasoning"] == "private attacker reasoning"
+    assert response_record["usage_events"] == [{"input_tokens": 101, "output_tokens": 37}]
+    assert response_record["stop_reasons"] == ["tool_use"]
+    streamed = [
+        row["event"] for row in records
+        if row.get("kind") == "inference_event"
+        and row.get("inference_id") == response_record["inference_id"]
+    ]
+    assert [event["type"] for event in streamed] == [
+        "reasoning_delta", "text_delta", "tool_use", "usage", "stop",
+    ]
+    assert tool_call["args"] == {"summary": "complete summary text"}
+    assert tool_result["content"] == "finish accepted: complete summary text"
+    assert any(row["kind"] == "agent_done" and row["status"] == "finished" for row in records)
 
 
 def test_agent_run_requires_target(tmp_path):

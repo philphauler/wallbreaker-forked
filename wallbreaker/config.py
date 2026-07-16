@@ -191,11 +191,14 @@ def doctor_report(config: Config) -> tuple[str, bool]:
     return "\n".join(lines), ok
 
 
-def _endpoint_from_table(name: str, table: dict) -> Endpoint:
+def _endpoint_from_table(name: str, table: dict, *, require_model: bool = False) -> Endpoint:
     protocol = str(table.get("protocol", "")).lower()
     # claude-code drives the local `claude` CLI - it authenticates itself and needs no
-    # base_url/api_key, so only protocol+model are required for it.
-    required = ("protocol", "model") if protocol == "claude-code" else ("protocol", "base_url", "model")
+    # base_url/api_key. Provider profiles may omit a default model while their catalog is
+    # being discovered; concrete target/judge/art endpoints still require one.
+    required = ("protocol",) if protocol == "claude-code" else ("protocol", "base_url")
+    if require_model:
+        required += ("model",)
     missing = [k for k in required if k not in table]
     if missing:
         raise ConfigError(f"Endpoint '{name}' missing keys: {', '.join(missing)}")
@@ -226,7 +229,7 @@ def _endpoint_from_table(name: str, table: dict) -> Endpoint:
         name=name,
         protocol=protocol,
         base_url=str(table.get("base_url", "")).rstrip("/"),
-        model=str(table["model"]),
+        model=str(table.get("model", "")),
         api_key_env=str(table.get("api_key_env", "")),
         api_key=str(table.get("api_key", "")),
         provider=provider,
@@ -315,18 +318,17 @@ def load_config(path: str | Path | None = None) -> Config:
     default_profile = data.get("default_profile") or next(iter(profiles))
     if default_profile not in profiles:
         raise ConfigError(f"default_profile '{default_profile}' is not defined")
-
     target = None
     if "target" in data:
-        target = _endpoint_from_table("target", data["target"])
+        target = _endpoint_from_table("target", data["target"], require_model=True)
 
     judge = None
     if "judge" in data:
-        judge = _endpoint_from_table("judge", data["judge"])
+        judge = _endpoint_from_table("judge", data["judge"], require_model=True)
 
     art = None
     if "art" in data:
-        art = _endpoint_from_table("art", data["art"])
+        art = _endpoint_from_table("art", data["art"], require_model=True)
 
     config = Config(
         default_profile=default_profile,

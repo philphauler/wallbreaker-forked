@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 
@@ -147,12 +148,21 @@ class OpenRouterImageProvider(Provider):
         return payload
 
     async def _post_chat(self, payload: dict) -> dict:
+        from ..session import trace_inference_request, trace_inference_response
+
         path = getattr(self.endpoint, "inference_path", "") or "/chat/completions"
         url = f"{self.endpoint.base_url}{path if path.startswith('/') else '/' + path}"
         headers = {
             "Authorization": f"Bearer {self.endpoint.require_key()}",
             "Content-Type": "application/json",
         }
+        inference_id = trace_inference_request(
+            self.endpoint,
+            payload.get("messages") or [],
+            operation="image_generation",
+            **{key: value for key, value in payload.items() if key != "messages"},
+        )
+        started = time.monotonic()
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(url, headers=headers, json=payload)
@@ -164,9 +174,24 @@ class OpenRouterImageProvider(Provider):
                 from ..model_catalog import record_model_success
 
                 record_model_success(self.endpoint)
+                trace_inference_response(
+                    inference_id,
+                    status="ok",
+                    raw_response=data,
+                    http_status=resp.status_code,
+                    duration_ms=round((time.monotonic() - started) * 1000, 3),
+                )
                 return data
-        except httpx.HTTPError as exc:
-            raise ProviderError(f"network error from {url}: {exc!r}") from exc
+        except Exception as exc:
+            trace_inference_response(
+                inference_id,
+                status="error",
+                error=f"{type(exc).__name__}: {exc}",
+                duration_ms=round((time.monotonic() - started) * 1000, 3),
+            )
+            if isinstance(exc, httpx.HTTPError):
+                raise ProviderError(f"network error from {url}: {exc!r}") from exc
+            raise
 
     async def generate(
         self,
@@ -284,26 +309,53 @@ async def vision_complete(
         "max_tokens": max_tokens,
         "stream": False,
     }
+    from ..session import trace_inference_request, trace_inference_response
+
+    inference_id = trace_inference_request(
+        endpoint,
+        messages,
+        operation="vision_completion",
+        max_tokens=max_tokens,
+        stream=False,
+    )
+    started = time.monotonic()
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(url, headers=headers, json=payload)
             if resp.status_code >= 400:
                 raise ProviderError(f"HTTP {resp.status_code} from {url}: {resp.text[:400]}")
             data = resp.json()
-    except httpx.HTTPError as exc:
-        raise ProviderError(f"network error from {url}: {exc!r}") from exc
+    except Exception as exc:
+        trace_inference_response(
+            inference_id,
+            status="error",
+            error=f"{type(exc).__name__}: {exc}",
+            duration_ms=round((time.monotonic() - started) * 1000, 3),
+        )
+        if isinstance(exc, httpx.HTTPError):
+            raise ProviderError(f"network error from {url}: {exc!r}") from exc
+        raise
     choices = data.get("choices") or []
-    if not choices:
-        return ""
-    content = (choices[0].get("message") or {}).get("content", "")
-    if isinstance(content, list):
-        answer = "".join(
-            str(p.get("text", "")) for p in content if isinstance(p, dict)
-        ).strip()
+    if choices:
+        content = (choices[0].get("message") or {}).get("content", "")
+        if isinstance(content, list):
+            answer = "".join(
+                str(p.get("text", "")) for p in content if isinstance(p, dict)
+            ).strip()
+        else:
+            answer = str(content or "").strip()
     else:
-        answer = str(content or "").strip()
+        answer = ""
     if answer:
         from ..model_catalog import record_model_success
 
         record_model_success(endpoint)
+    trace_inference_response(
+        inference_id,
+        status="ok",
+        text=answer,
+        raw_response=data,
+        http_status=resp.status_code,
+        duration_ms=round((time.monotonic() - started) * 1000, 3),
+    )
     return answer

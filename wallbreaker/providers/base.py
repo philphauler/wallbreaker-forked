@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
@@ -132,24 +133,87 @@ class Provider(ABC):
         model thinking through harmful content before refusing in the answer) are a real
         bypass, so the attack tools surface this and the judge grades it.
         """
-        from ..agent.messages import ReasoningDelta, TextDelta
+        from ..agent.messages import ReasoningDelta, StopEvent, TextDelta, UsageEvent
+        from ..session import (
+            trace_inference_event, trace_inference_request, trace_inference_response,
+        )
 
         text_chunks: list[str] = []
         reasoning_chunks: list[str] = []
-        async for event in self.stream(
-            messages, tools=None, system=system, max_tokens=max_tokens,
+        usage_events: list[dict] = []
+        stop_reasons: list[str] = []
+        stream_events: list[dict] = []
+        stream_counts = {"text_delta": 0, "reasoning_delta": 0, "usage": 0, "stop": 0}
+        inference_id = trace_inference_request(
+            self.endpoint,
+            messages,
+            system=system,
+            operation="completion",
+            max_tokens=max_tokens,
             temperature=temperature,
-        ):
-            if isinstance(event, TextDelta):
-                text_chunks.append(event.text)
-            elif isinstance(event, ReasoningDelta):
-                reasoning_chunks.append(event.text)
+            stream=True,
+        )
+        started = time.monotonic()
+        try:
+            async for event in self.stream(
+                messages, tools=None, system=system, max_tokens=max_tokens,
+                temperature=temperature,
+            ):
+                if isinstance(event, TextDelta):
+                    text_chunks.append(event.text)
+                    stream_counts["text_delta"] += 1
+                    stream_events.append({"type": "text_delta", "text": event.text})
+                    trace_inference_event(inference_id, stream_events[-1])
+                elif isinstance(event, ReasoningDelta):
+                    reasoning_chunks.append(event.text)
+                    stream_counts["reasoning_delta"] += 1
+                    stream_events.append({"type": "reasoning_delta", "text": event.text})
+                    trace_inference_event(inference_id, stream_events[-1])
+                elif isinstance(event, UsageEvent):
+                    usage = {
+                        "input_tokens": event.input_tokens,
+                        "output_tokens": event.output_tokens,
+                    }
+                    usage_events.append(usage)
+                    stream_counts["usage"] += 1
+                    stream_events.append({"type": "usage", **usage})
+                    trace_inference_event(inference_id, stream_events[-1])
+                elif isinstance(event, StopEvent):
+                    stop_reasons.append(event.stop_reason)
+                    stream_counts["stop"] += 1
+                    stream_events.append({"type": "stop", "stop_reason": event.stop_reason})
+                    trace_inference_event(inference_id, stream_events[-1])
+        except BaseException as exc:
+            trace_inference_response(
+                inference_id,
+                status="error",
+                text="".join(text_chunks),
+                reasoning="".join(reasoning_chunks),
+                error=f"{type(exc).__name__}: {exc}",
+                duration_ms=round((time.monotonic() - started) * 1000, 3),
+                usage_events=usage_events,
+                stop_reasons=stop_reasons,
+                stream_event_counts=stream_counts,
+                stream_events=stream_events,
+            )
+            raise
         text = "".join(text_chunks)
         reasoning = "".join(reasoning_chunks)
         # When the answer was empty, providers fold reasoning into a "[reasoning-only
         # response]" TextDelta so complete() isn't blank; don't double-report it here.
         if reasoning and text.startswith("[reasoning-only response]"):
             text = ""
+        trace_inference_response(
+            inference_id,
+            status="ok",
+            text=text,
+            reasoning=reasoning,
+            duration_ms=round((time.monotonic() - started) * 1000, 3),
+            usage_events=usage_events,
+            stop_reasons=stop_reasons,
+            stream_event_counts=stream_counts,
+            stream_events=stream_events,
+        )
         if text or reasoning:
             from ..model_catalog import record_model_success
 

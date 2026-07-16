@@ -923,9 +923,10 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
     @app.post("/api/providers/{name}/test")
     async def provider_test(name: str):
-        if config is None or name not in config.profiles:
-            raise HTTPException(status_code=404, detail=f"unknown or disabled provider '{name}'")
-        result = await _discover_profile_models(name, config.profiles[name])
+        endpoint = getattr(config, "all_profiles", {}).get(name) if config is not None else None
+        if endpoint is None:
+            raise HTTPException(status_code=404, detail=f"unknown provider '{name}'")
+        result = await _discover_profile_models(name, endpoint)
         if result["fetched"] and model_catalog is not None:
             model_catalog.sync(name, result["models"], "remote")
             result["refreshed_at"] = model_catalog.mark_refreshed(name)
@@ -991,14 +992,15 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
     async def models_get(profile: str):
         if config is None:
             raise HTTPException(status_code=400, detail="no config loaded")
-        if profile not in config.profiles:
+        endpoint = config.all_profiles.get(profile)
+        if endpoint is None:
             raise HTTPException(status_code=404, detail=f"unknown profile '{profile}'")
         refreshed_at = model_catalog.last_refreshed(profile) if model_catalog is not None else ""
         if refreshed_at:
             entries = model_catalog.list(profile)
             return {
                 "profile": profile,
-                "protocol": config.profiles[profile].protocol,
+                "protocol": endpoint.protocol,
                 "models": [entry["model_id"] for entry in entries],
                 "entries": entries,
                 "fetched": True,
@@ -1006,7 +1008,7 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
                 "refreshed_at": refreshed_at,
                 "error": "",
             }
-        result = await _discover_profile_models(profile, config.profiles[profile])
+        result = await _discover_profile_models(profile, endpoint)
         if model_catalog is not None:
             if result["fetched"]:
                 model_catalog.sync(profile, result["models"], "remote")
@@ -1018,14 +1020,14 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
     @app.get("/api/providers/{name}/models")
     def provider_models(name: str):
-        if config is None or name not in config.profiles:
+        if config is None or name not in config.all_profiles:
             raise HTTPException(status_code=404, detail=f"unknown provider '{name}'")
         entries = model_catalog.list(name) if model_catalog is not None else []
         return {"provider": name, "models": [item["model_id"] for item in entries], "entries": entries}
 
     @app.post("/api/providers/{name}/models")
     def provider_model_add(name: str, body: dict):
-        if config is None or name not in config.profiles:
+        if config is None or name not in config.all_profiles:
             raise HTTPException(status_code=404, detail=f"unknown provider '{name}'")
         model_id = str(body.get("model") or "").strip()
         if not model_id:
@@ -1035,9 +1037,10 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
     @app.post("/api/providers/{name}/models/refresh")
     async def provider_models_refresh(name: str):
-        if config is None or name not in config.profiles:
+        endpoint = config.all_profiles.get(name) if config is not None else None
+        if endpoint is None:
             raise HTTPException(status_code=404, detail=f"unknown provider '{name}'")
-        result = await _discover_profile_models(name, config.profiles[name])
+        result = await _discover_profile_models(name, endpoint)
         if result["fetched"]:
             model_catalog.sync(name, result["models"], "remote")
             result["refreshed_at"] = model_catalog.mark_refreshed(name)
@@ -1271,15 +1274,24 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             args["system"] = composed["system"]
 
         from ..tools import build_registry
+        from ..session import inference_logging
 
         reg = build_registry(config)
-        result = await reg.execute("query_target", args)
-        verdict = _extract_verdict(result.content)
         if not console_runlog._started:
             console_runlog.set_run_meta(
                 source="dashboard_console",
                 models=run_models_meta(config, attacker=None),
             )
+        console_runlog.event(
+            "console_request",
+            request_body=body,
+            composed=composed,
+            tool="query_target",
+            tool_args=args,
+        )
+        with inference_logging(console_runlog):
+            result = await reg.execute("query_target", args)
+        verdict = _extract_verdict(result.content)
         target = getattr(config, "target", None)
         console_runlog.event(
             "attack_fire",
@@ -1347,6 +1359,7 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
         registry = build_registry(config)
         runlog = RunLog(directory=str(sessions))
         runlog.set_run_meta(
+            source="dashboard_agent",
             models=run_models_meta(config, attacker=brain),
             agent={"max_rounds": max_rounds, "max_tokens": max_tokens},
         )
@@ -1358,19 +1371,61 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             except Exception:
                 pass
 
-        registry.ctx.progress = lambda m: push({"type": "progress", "text": str(m)})
+        def progress(message) -> None:
+            text = str(message)
+            runlog.event("progress", text=text)
+            push({"type": "progress", "text": text})
+
+        def tool_start(tool_id, name, args) -> None:
+            runlog.event("tool_call", tool_use_id=tool_id, tool=name, args=args)
+            push({"type": "tool_start", "name": name, "args": _summarize_args(args)})
+
+        def tool_result(tool_id, name, content, is_error) -> None:
+            runlog.event(
+                "tool_result",
+                tool_use_id=tool_id,
+                tool=name,
+                content=content or "",
+                error=bool(is_error),
+            )
+            push({
+                "type": "tool_result", "name": name, "content": (content or "")[:6000],
+                "error": bool(is_error), "verdict": _extract_verdict(content or ""),
+            })
+
+        def round_event(round_number, maximum) -> None:
+            runlog.event("agent_round", round=round_number, max_rounds=maximum)
+            push({"type": "round", "round": round_number, "max": maximum})
+
+        def error_event(error) -> None:
+            text = str(error)
+            runlog.event("agent_error", error=text)
+            push({"type": "error", "error": text})
+
+        def feedback_event(message) -> None:
+            text = str(message)
+            runlog.event("operator_feedback", text=text)
+            push({"type": "feedback", "text": text})
+
+        def internal_message(role, text, source) -> None:
+            runlog.event("history_message", role=role, text=text, source=source)
+
+        def tool_run_event(event) -> None:
+            runlog.event("tool_run_event", event=event)
+            push({"type": "progress", "text": json.dumps(event, ensure_ascii=False)})
+
+        registry.ctx.progress = progress
+        registry.ctx.run_events = tool_run_event
         registry.ctx.record = lambda p, r, lbl, rs, t: runlog.verdict(p, r, lbl, rs, t)
 
         events = AgentEvents(
             on_text=lambda t: push({"type": "text", "text": t}),
-            on_tool_start=lambda _i, n, a: push({"type": "tool_start", "name": n, "args": _summarize_args(a)}),
-            on_tool_result=lambda _i, n, c, e: push({
-                "type": "tool_result", "name": n, "content": (c or "")[:6000],
-                "error": bool(e), "verdict": _extract_verdict(c or ""),
-            }),
-            on_round=lambda r, m: push({"type": "round", "round": r, "max": m}),
-            on_error=lambda e: push({"type": "error", "error": str(e)}),
-            on_feedback=lambda m: push({"type": "feedback", "text": str(m)}),
+            on_tool_start=tool_start,
+            on_tool_result=tool_result,
+            on_round=round_event,
+            on_error=error_event,
+            on_feedback=feedback_event,
+            on_internal_message=internal_message,
             on_usage=lambda i, o: push({"type": "usage", "input": i, "output": o}),
         )
 
@@ -1378,19 +1433,24 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
         runlog.event("objective", text=objective)
 
         async def runner():
+            from ..session import inference_logging
+
             async with agent_lock:
                 try:
-                    res = await run_autonomous(
-                        provider, registry, history, system=DEFAULT_SYSTEM,
-                        events=events, max_rounds=max_rounds, max_tokens=max_tokens,
-                    )
+                    with inference_logging(runlog):
+                        res = await run_autonomous(
+                            provider, registry, history, system=DEFAULT_SYSTEM,
+                            events=events, max_rounds=max_rounds, max_tokens=max_tokens,
+                        )
                     data = res.data or {}
+                    summary = data.get("summary") or data.get("question") or ""
+                    runlog.event("agent_done", status=res.status, summary=summary)
                     push({
                         "type": "done", "status": res.status,
-                        "summary": data.get("summary") or data.get("question") or "",
+                        "summary": summary, "run_log": runlog.path.name,
                     })
                 except Exception as exc:  # noqa: BLE001
-                    push({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
+                    error_event(f"{type(exc).__name__}: {exc}")
                 finally:
                     push(None)
 
@@ -1399,7 +1459,8 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
         async def gen():
             push({"type": "start", "objective": objective, "brain": getattr(brain, "model", ""),
                   "target": getattr(config.target, "model", ""),
-                  "max_rounds": max_rounds, "max_tokens": max_tokens})
+                  "max_rounds": max_rounds, "max_tokens": max_tokens,
+                  "run_log": runlog.path.name})
             try:
                 while True:
                     ev = await queue.get()

@@ -22,6 +22,7 @@ export function Agent({ hasTarget }: { hasTarget: boolean }) {
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_AGENT_CONFIG);
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
+  const [runLog, setRunLog] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
   const [configStatus, setConfigStatus] = useState("");
   const [err, setErr] = useState("");
@@ -50,6 +51,7 @@ export function Agent({ hasTarget }: { hasTarget: boolean }) {
   }
 
   function onEvent(ev: AgentEvent) {
+    if (typeof ev.run_log === "string" && ev.run_log) setRunLog(ev.run_log);
     switch (ev.type) {
       case "start": push({ kind: "start", brain: String(ev.brain || ""), target: String(ev.target || "") }); break;
       case "round": push({ kind: "round", round: Number(ev.round), max: Number(ev.max) }); break;
@@ -65,7 +67,7 @@ export function Agent({ hasTarget }: { hasTarget: boolean }) {
 
   async function run() {
     if (!objective.trim()) return;
-    setItems([]); setErr(""); setRunning(true);
+    setItems([]); setErr(""); setRunLog(""); setRunning(true);
     const ac = new AbortController();
     abortRef.current = ac;
     try {
@@ -127,6 +129,11 @@ export function Agent({ hasTarget }: { hasTarget: boolean }) {
               onClick={stop}>■ STOP</button>
           )}
           {running && <span className="muted mono" style={{ marginLeft: 4 }}>working…</span>}
+          {runLog && (
+            <a className="agent-run-log mono" href="#runs" title="Open Run logs">
+              saved: {runLog}
+            </a>
+          )}
         </div>
         {err && <div className="err" style={{ marginTop: 10 }}>{err}</div>}
       </div>

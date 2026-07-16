@@ -56,6 +56,49 @@ def test_provider_crud_redacts_key_and_updates_env(tmp_path):
     assert "custom" not in persisted["profiles"]
 
 
+def test_provider_can_be_saved_and_tested_without_default_model(monkeypatch, tmp_path):
+    import wallbreaker.dashboard.server as server_mod
+
+    cfg = _config(tmp_path)
+
+    async def discover(name, endpoint):
+        assert name == "catalog-only"
+        assert endpoint.model == ""
+        return {
+            "profile": name,
+            "protocol": endpoint.protocol,
+            "models": ["vendor/model-a", "vendor/model-b"],
+            "fetched": True,
+            "cached": False,
+            "refreshed_at": "",
+            "error": "",
+        }
+
+    monkeypatch.setattr(server_mod, "_discover_profile_models", discover)
+    client = TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
+    saved = client.put("/api/providers/catalog-only", json={
+        "protocol": "openai",
+        "base_url": "https://catalog.example/v1",
+        "api_key_env": "CATALOG_API_KEY",
+        "model": "",
+        "enabled": False,
+    })
+
+    assert saved.status_code == 200
+    assert saved.json()["model"] == ""
+    assert saved.json()["enabled"] is False
+    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert "model" not in persisted["profiles"]["catalog-only"]
+    assert load_config(tmp_path / "config.toml").all_profiles["catalog-only"].model == ""
+
+    tested = client.post("/api/providers/catalog-only/test")
+    assert tested.status_code == 200
+    assert tested.json()["models"] == ["vendor/model-a", "vendor/model-b"]
+    catalog = client.get("/api/models", params={"profile": "catalog-only"})
+    assert catalog.status_code == 200
+    assert catalog.json()["models"] == ["vendor/model-a", "vendor/model-b"]
+
+
 def test_config_provider_can_be_edited_like_any_other_provider(tmp_path):
     cfg = _config(tmp_path)
     client = TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
@@ -128,28 +171,6 @@ def test_roles_are_independent_and_persisted(tmp_path):
     assert client.put("/api/roles/research", json={
         "provider": "other", "model": "unused",
     }).status_code == 404
-
-
-def test_provider_registry_removes_obsolete_overlay_file(tmp_path):
-    cfg = _config(tmp_path)
-    registry_path = tmp_path / ".wallbreaker_providers.json"
-    registry_path.write_text(json.dumps({
-        "providers": {
-            "migrated": {
-                "protocol": "openai", "base_url": "https://migrated.example/v1",
-                "model": "migrated-model", "api_key_env": "MIGRATED_API_KEY",
-                "enabled": True,
-            },
-        },
-        "drafts": {"old": {"provider_name": "obsolete"}},
-    }), encoding="utf-8")
-
-    from wallbreaker.provider_registry import ProviderRegistry
-
-    ProviderRegistry(cfg)
-    assert not registry_path.exists()
-    persisted = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
-    assert persisted["profiles"]["migrated"]["model"] == "migrated-model"
 
 
 def test_dashboard_removes_obsolete_provider_research_state(tmp_path):

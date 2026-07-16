@@ -43,3 +43,29 @@ def test_apply_target_overrides_model_and_profile():
     apply_target_overrides(cfg, Namespace(target=None, target_model="x-ai/grok-2"))
     assert cfg.target.model == "x-ai/grok-2"
     assert cfg.target.base_url == "https://api.z.ai/api/anthropic"
+
+
+def test_provider_profile_default_model_is_optional(tmp_path):
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'default_profile = "ready"\n\n'
+        '[profiles.ready]\nprotocol = "openai"\nbase_url = "https://ready.example/v1"\nmodel = "ready-model"\n\n'
+        '[profiles.discovering]\nprotocol = "openai"\nbase_url = "https://models.example/v1"\n',
+        encoding="utf-8",
+    )
+
+    config = load_config(path)
+    assert config.profiles["discovering"].model == ""
+
+
+def test_concrete_target_still_requires_model(tmp_path):
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'default_profile = "ready"\n\n'
+        '[profiles.ready]\nprotocol = "openai"\nbase_url = "https://ready.example/v1"\nmodel = "ready-model"\n\n'
+        '[target]\nprotocol = "openai"\nbase_url = "https://target.example/v1"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="target.*model"):
+        load_config(path)

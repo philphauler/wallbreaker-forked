@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -11,6 +12,7 @@ from .messages import (
     StopEvent,
     TextBlock,
     TextDelta,
+    ReasoningDelta,
     ToolResultBlock,
     ToolUseBlock,
     ToolUseEvent,
@@ -34,6 +36,7 @@ CONTINUE_NUDGE = (
 @dataclass
 class AgentEvents:
     on_text: Callable[[str], None] = lambda _t: None
+    on_reasoning: Callable[[str], None] = lambda _t: None
     on_tool_start: Callable[[str, str, dict], None] = lambda _i, _n, _a: None
     on_tool_result: Callable[[str, str, str, bool], None] = lambda _i, _n, _c, _e: None
     on_turn_end: Callable[[Message], None] = lambda _m: None
@@ -41,6 +44,7 @@ class AgentEvents:
     on_error: Callable[[str], None] = lambda _e: None
     on_round: Callable[[int, int], None] = lambda _r, _m: None
     on_feedback: Callable[[str], None] = lambda _m: None
+    on_internal_message: Callable[[str, str, str], None] = lambda _r, _t, _s: None
 
 
 @dataclass
@@ -79,7 +83,8 @@ def _push_feedback(
         history[-1].content.extend(blocks)
     else:
         history.append(Message(role="user", content=blocks))
-    for m in texts:
+    for block, m in zip(blocks, texts):
+        events.on_internal_message("user", block.text, "operator_feedback")
         events.on_feedback(m)
     return True
 
@@ -99,29 +104,117 @@ async def run_turn(
     specs = registry.specs() if registry and registry.names() else None
     last: Message | None = None
 
-    for _ in range(max_iters):
+    for iteration in range(1, max_iters + 1):
         # drain operator steering BEFORE each model call so advice lands on the very next
         # turn (mid-round), not only at the round boundary.
         if feedback:
             _push_feedback(history, list(feedback()), events)
         text_parts: list[str] = []
+        reasoning_parts: list[str] = []
         tool_calls: list[ToolUseEvent] = []
+        usage_events: list[dict] = []
+        stop_reasons: list[str] = []
+        stream_events: list[dict] = []
+        stream_counts = {
+            "text_delta": 0, "reasoning_delta": 0, "tool_use": 0,
+            "usage": 0, "stop": 0,
+        }
+        from ..session import (
+            trace_inference_event, trace_inference_request, trace_inference_response,
+        )
+
+        inference_id = trace_inference_request(
+            getattr(provider, "endpoint", None),
+            history,
+            system=system,
+            tools=specs,
+            operation="agent_turn",
+            max_tokens=max_tokens,
+            iteration=iteration,
+            stream=True,
+        )
+        started = time.monotonic()
         try:
             async for ev in provider.stream(
                 history, tools=specs, system=system, max_tokens=max_tokens
             ):
                 if isinstance(ev, TextDelta):
                     text_parts.append(ev.text)
+                    stream_counts["text_delta"] += 1
+                    stream_events.append({"type": "text_delta", "text": ev.text})
+                    trace_inference_event(inference_id, stream_events[-1])
                     events.on_text(ev.text)
+                elif isinstance(ev, ReasoningDelta):
+                    reasoning_parts.append(ev.text)
+                    stream_counts["reasoning_delta"] += 1
+                    stream_events.append({"type": "reasoning_delta", "text": ev.text})
+                    trace_inference_event(inference_id, stream_events[-1])
+                    events.on_reasoning(ev.text)
                 elif isinstance(ev, ToolUseEvent):
                     tool_calls.append(ev)
+                    stream_counts["tool_use"] += 1
+                    stream_events.append({
+                        "type": "tool_use", "id": ev.id, "name": ev.name,
+                        "input": ev.input,
+                    })
+                    trace_inference_event(inference_id, stream_events[-1])
                 elif isinstance(ev, UsageEvent):
+                    usage = {
+                        "input_tokens": ev.input_tokens,
+                        "output_tokens": ev.output_tokens,
+                    }
+                    usage_events.append(usage)
+                    stream_counts["usage"] += 1
+                    stream_events.append({"type": "usage", **usage})
+                    trace_inference_event(inference_id, stream_events[-1])
                     events.on_usage(ev.input_tokens, ev.output_tokens)
                 elif isinstance(ev, StopEvent):
-                    pass
+                    stop_reasons.append(ev.stop_reason)
+                    stream_counts["stop"] += 1
+                    stream_events.append({"type": "stop", "stop_reason": ev.stop_reason})
+                    trace_inference_event(inference_id, stream_events[-1])
         except ProviderError as exc:
+            trace_inference_response(
+                inference_id,
+                status="error",
+                text="".join(text_parts),
+                reasoning="".join(reasoning_parts),
+                error=f"{type(exc).__name__}: {exc}",
+                duration_ms=round((time.monotonic() - started) * 1000, 3),
+                usage_events=usage_events,
+                stop_reasons=stop_reasons,
+                stream_event_counts=stream_counts,
+                stream_events=stream_events,
+            )
             events.on_error(str(exc))
             return TurnResult(last)
+        except BaseException as exc:
+            trace_inference_response(
+                inference_id,
+                status="error",
+                text="".join(text_parts),
+                reasoning="".join(reasoning_parts),
+                error=f"{type(exc).__name__}: {exc}",
+                duration_ms=round((time.monotonic() - started) * 1000, 3),
+                usage_events=usage_events,
+                stop_reasons=stop_reasons,
+                stream_event_counts=stream_counts,
+                stream_events=stream_events,
+            )
+            raise
+
+        trace_inference_response(
+            inference_id,
+            status="ok",
+            text="".join(text_parts),
+            reasoning="".join(reasoning_parts),
+            duration_ms=round((time.monotonic() - started) * 1000, 3),
+            usage_events=usage_events,
+            stop_reasons=stop_reasons,
+            stream_event_counts=stream_counts,
+            stream_events=stream_events,
+            tool_calls=[{"id": tc.id, "name": tc.name} for tc in tool_calls],
+        )
 
         content: list = []
         joined = "".join(text_parts)
@@ -222,5 +315,6 @@ async def run_autonomous(
         # operator feedback that arrived after the last drain takes the place of the nudge
         if not _drain():
             history.append(user(CONTINUE_NUDGE))
+            events.on_internal_message("user", CONTINUE_NUDGE, "autonomous_nudge")
 
     return AutoResult("max_rounds", {}, result.message)

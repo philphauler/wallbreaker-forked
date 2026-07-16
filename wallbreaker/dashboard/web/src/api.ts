@@ -291,6 +291,7 @@ export const api = {
 
 export interface AgentEvent {
   type: "start" | "round" | "text" | "tool_start" | "tool_result" | "progress" | "feedback" | "usage" | "error" | "done";
+  run_log?: string;
   [k: string]: unknown;
 }
 

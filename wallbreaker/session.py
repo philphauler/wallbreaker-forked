@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
+from typing import Iterator
+from uuid import uuid4
 
 from .agent.messages import (
     Message,
@@ -65,6 +69,11 @@ def load_run_log(path: str | Path) -> tuple[list[Message], dict]:
             records.append(json.loads(line))
         except json.JSONDecodeError:
             continue
+    agent_inference_ids = {
+        row.get("inference_id") for row in records
+        if row.get("kind") == "inference_request" and row.get("operation") == "agent_turn"
+    }
+    has_explicit_assistant = any(row.get("kind") == "assistant" for row in records)
     history: list[Message] = []
     for r in records:
         kind = r.get("kind")
@@ -72,6 +81,14 @@ def load_run_log(path: str | Path) -> tuple[list[Message], dict]:
             history.append(user(r.get("text", "")))
         elif kind == "assistant":
             text = r.get("text", "")
+            if text.strip():
+                history.append(assistant(text))
+        elif (
+            kind == "inference_response"
+            and not has_explicit_assistant
+            and r.get("inference_id") in agent_inference_ids
+        ):
+            text = str(r.get("text") or "")
             if text.strip():
                 history.append(assistant(text))
     objective = next(
@@ -134,6 +151,61 @@ def run_models_meta(config=None, attacker=None, judge=None) -> dict:
     }
 
 
+_ACTIVE_RUNLOG: ContextVar["RunLog | None"] = ContextVar(
+    "wallbreaker_active_runlog", default=None
+)
+
+
+@contextmanager
+def inference_logging(runlog: "RunLog") -> Iterator[None]:
+    """Route every model call in this async context into ``runlog``."""
+    token = _ACTIVE_RUNLOG.set(runlog)
+    try:
+        yield
+    finally:
+        _ACTIVE_RUNLOG.reset(token)
+
+
+def trace_inference_request(
+    endpoint,
+    messages,
+    *,
+    system: str | None = None,
+    tools: list[dict] | None = None,
+    operation: str = "completion",
+    **parameters,
+) -> str:
+    inference_id = uuid4().hex
+    runlog = _ACTIVE_RUNLOG.get()
+    if runlog is not None:
+        runlog.inference_request(
+            inference_id,
+            endpoint,
+            messages,
+            system=system,
+            tools=tools,
+            operation=operation,
+            parameters=parameters,
+        )
+    return inference_id
+
+
+def trace_inference_response(inference_id: str, **data) -> None:
+    runlog = _ACTIVE_RUNLOG.get()
+    if runlog is not None:
+        runlog.inference_response(inference_id, **data)
+
+
+def trace_inference_event(inference_id: str, event: dict) -> None:
+    runlog = _ACTIVE_RUNLOG.get()
+    if runlog is not None:
+        runlog.event(
+            "inference_event",
+            inference_id=inference_id,
+            event=runlog._json_value(event),
+        )
+
+
 class RunLog:
     def __init__(self, directory: str | Path = "sessions", enabled: bool = True):
         self.enabled = enabled
@@ -141,6 +213,7 @@ class RunLog:
         self.path = self.dir / f"run-{_timestamp()}.jsonl"
         self._started = False
         self._run_meta: dict = {}
+        self._seq = 0
 
     def _ensure(self) -> None:
         if not self._started:
@@ -154,15 +227,17 @@ class RunLog:
                 })
 
     def _write(self, record: dict) -> None:
+        self._seq += 1
+        record.setdefault("seq", self._seq)
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     def set_run_meta(self, **data) -> None:
         """Store static run metadata to write as the first JSONL row on first use."""
-        self._run_meta = {
+        self._run_meta.update({
             k: v for k, v in data.items()
             if v is not None and v != {} and v != []
-        }
+        })
 
     def event(self, kind: str, **data) -> None:
         if not self.enabled:
@@ -171,6 +246,80 @@ class RunLog:
         record = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": kind}
         record.update(data)
         self._write(record)
+
+    def _json_value(self, value):
+        if isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            return [self._json_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._json_value(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): self._json_value(item) for key, item in value.items()}
+        return value
+
+    def _message_record(self, message) -> dict:
+        blocks = []
+        for block in getattr(message, "content", []):
+            if isinstance(block, TextBlock):
+                blocks.append({"type": "text", "text": block.text})
+            elif isinstance(block, ToolUseBlock):
+                blocks.append({
+                    "type": "tool_use", "id": block.id, "name": block.name,
+                    "input": self._json_value(block.input),
+                })
+            elif isinstance(block, ToolResultBlock):
+                blocks.append({
+                    "type": "tool_result", "tool_use_id": block.tool_use_id,
+                    "content": block.content,
+                    "is_error": block.is_error,
+                })
+        return {"role": getattr(message, "role", ""), "content": blocks}
+
+    @staticmethod
+    def _endpoint_record(endpoint) -> dict:
+        fields = (
+            "name", "protocol", "base_url", "model", "api_key_env", "provider",
+            "timeout", "modality", "reasoning", "system_mode", "auth_style",
+            "inference_path", "models_path",
+        )
+        return {
+            field: list(value) if isinstance(value, tuple) else value
+            for field in fields
+            if (value := getattr(endpoint, field, None)) not in (None, "", (), [])
+        }
+
+    def inference_request(
+        self,
+        inference_id: str,
+        endpoint,
+        messages,
+        *,
+        system: str | None,
+        tools: list[dict] | None,
+        operation: str,
+        parameters: dict,
+    ) -> None:
+        self.event(
+            "inference_request",
+            inference_id=inference_id,
+            operation=operation,
+            endpoint=self._endpoint_record(endpoint),
+            messages=[
+                self._json_value(message) if isinstance(message, dict)
+                else self._message_record(message)
+                for message in messages
+            ],
+            system=system,
+            tools=self._json_value(tools) if tools is not None else None,
+            parameters=self._json_value(parameters),
+        )
+
+    def inference_response(self, inference_id: str, **data) -> None:
+        record = {"inference_id": inference_id}
+        for key, value in data.items():
+            record[key] = self._json_value(value)
+        self.event("inference_response", **record)
 
     def user(self, text: str) -> None:
         self.event("user", text=text)

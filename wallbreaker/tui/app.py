@@ -244,7 +244,7 @@ class RthApp(App):
         self._target_profile = prefs.get("target_profile")
         self._target_model = prefs.get("target_model")
         self._target_modality = prefs.get("target_modality")
-        self.runlog.set_run_meta(models=self._run_models_meta())
+        self.runlog.set_run_meta(source="tui_agent", models=self._run_models_meta())
 
     def _save_prefs(self) -> None:
         if not self._state_path:
@@ -377,6 +377,7 @@ class RthApp(App):
         self._refresh_status()
 
     def _tool_progress(self, message: str) -> None:
+        self.runlog.event("progress", text=message)
         self._mount(widgets.info_panel(message, title="progress"))
 
     _VERDICT_BUCKET = {
@@ -385,6 +386,7 @@ class RthApp(App):
 
     def _run_sink(self, event: dict) -> None:
         """Render a structured multi-step run as ONE self-updating panel."""
+        self.runlog.event("tool_run_event", event=event)
         ev = event.get("ev")
         rid = event.get("id")
         if ev == "start":
@@ -567,6 +569,7 @@ class RthApp(App):
         return fb
 
     def _on_feedback(self, msg: str) -> None:
+        self.runlog.event("operator_feedback", text=msg)
         self._mount(widgets.feedback_panel(msg, queued=False))
 
     def _submit_user(self, text: str) -> None:
@@ -695,6 +698,8 @@ class RthApp(App):
             self._mount(widgets.info_panel(note, title="edit"))
 
     async def _agent_turn(self) -> None:
+        from ..session import inference_logging
+
         events = AgentEvents(
             on_text=self._on_text,
             on_tool_start=self._on_tool_start,
@@ -704,30 +709,35 @@ class RthApp(App):
             on_round=self._on_round,
             on_usage=self._on_usage,
             on_feedback=self._on_feedback,
+            on_internal_message=lambda role, text, source: self.runlog.event(
+                "history_message", role=role, text=text, source=source
+            ),
         )
         try:
-            if self.auto:
-                result = await run_autonomous(
-                    self.provider,
-                    self.registry,
-                    self.history,
-                    system=self.system,
-                    events=events,
-                    max_rounds=self.max_rounds,
-                    max_tokens=self.max_tokens,
-                    feedback=self._drain_feedback,
-                )
-                self._handle_auto_result(result)
-            else:
-                await run_turn(
-                    self.provider,
-                    self.registry,
-                    self.history,
-                    system=self.system,
-                    events=events,
-                    max_tokens=self.max_tokens,
-                    feedback=self._drain_feedback,
-                )
+            with inference_logging(self.runlog):
+                if self.auto:
+                    result = await run_autonomous(
+                        self.provider,
+                        self.registry,
+                        self.history,
+                        system=self.system,
+                        events=events,
+                        max_rounds=self.max_rounds,
+                        max_tokens=self.max_tokens,
+                        feedback=self._drain_feedback,
+                    )
+                    self.runlog.event("agent_done", status=result.status, data=result.data)
+                    self._handle_auto_result(result)
+                else:
+                    await run_turn(
+                        self.provider,
+                        self.registry,
+                        self.history,
+                        system=self.system,
+                        events=events,
+                        max_tokens=self.max_tokens,
+                        feedback=self._drain_feedback,
+                    )
         finally:
             self._assistant = None
             self._busy = False
@@ -741,6 +751,7 @@ class RthApp(App):
         self._refresh_status()
 
     def _on_round(self, rnd: int, total: int) -> None:
+        self.runlog.event("agent_round", round=rnd, max_rounds=total)
         self._assistant = None
         self._round_label = f"{rnd}/{total}"
         self._refresh_status()
@@ -846,6 +857,7 @@ class RthApp(App):
         self.runlog.verdict(payload, response, label, reason, technique)
 
     def _on_error(self, message: str) -> None:
+        self.runlog.event("agent_error", error=message)
         self._mount(widgets.error_panel(message))
 
     def action_clear_log(self) -> None:
