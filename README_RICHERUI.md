@@ -25,8 +25,8 @@ cd wallbreaker/dashboard/web
 npm run dev
 ```
 
-The dashboard has seven views: **Agent**, **Overview**, **Attack console**, **Findings**,
-**Run logs**, **Arsenal**, and **Settings**. Use the arrow beside the Wallbreaker logo to
+The dashboard has nine views: **Agent**, **Overview**, **Attack console**, **Findings**,
+**Run logs**, **Arsenal**, **Profiles**, **Advanced**, and **Settings**. Use the arrow beside the Wallbreaker logo to
 collapse or expand the navigation rail. The choice is remembered in the browser.
 
 ## Provider connections
@@ -92,21 +92,30 @@ ID remembers it in the catalog.
 
 These actions work identically for every provider.
 
-## Choose attacker, target, and judge models
+## Agent profiles and role selection
 
-The top bar contains compact **Attacker**, **Target**, and **Judge** controls. Select one
-to change its provider and model without leaving the current view.
+Open **Profiles** to create named configurations dedicated to the attacker, target, or
+judge. A profile contains its provider connection, model, and an optional system prompt.
+The prompt can be pasted directly or read from a local UTF-8 text file; the two sources are
+mutually exclusive. File paths are checked before the profile can be saved.
 
-The Settings page provides the expanded controls:
+Each role section can create, edit, duplicate, activate, or remove profiles. An active
+profile cannot be removed until another profile or **Custom** is selected. Model fields use
+the provider model directory and continue to accept plain model IDs.
 
-- **Target — the model under attack** selects the target provider, model, and modality.
-  `auto` derives image modality from the model ID; choose `text` or `image` to force it.
-- **Attacker brain & judge** selects the provider/model used to drive the attack and the
-  provider/model used to grade responses.
+The top bar contains compact **Attacker**, **Target**, and **Judge** controls. Choose a
+named profile or **Custom**. Custom mode selects a provider and model without requiring a
+named profile. Both named and Custom assignments are written directly to `config.toml`.
 
-Role choices and runtime overrides are saved in `.wallbreaker_state.json` and apply to the
-next console fire or agent run without restarting the dashboard. Provider definitions and
-credentials continue to persist in `config.toml` and `.env` respectively.
+System-prompt behavior is role-aware:
+
+- Attacker prompts lead the mandatory Wallbreaker tool-driving instructions.
+- Target prompts are defaults; a system prompt supplied by a specific attack overrides them.
+- Judge prompts lead the mandatory grading and structured-output contract.
+
+Every console fire and agent run resolves fresh, run-scoped endpoints from these assignments.
+Provider URLs and credentials always come from Provider connections, so stale runtime state
+cannot silently redirect a selected role to a different provider.
 
 ## Autonomous Agent view
 
@@ -184,39 +193,28 @@ The top-bar ASR badge is refreshed as you move through the dashboard.
 
 ## Advanced settings and presets
 
-Open **Settings → Advanced settings** for runtime and endpoint controls. Three presets are
+Open **Advanced** for runtime controls. Three presets are
 available:
 
 | Preset | Intended use |
 |---|---|
 | Balanced | Default run profile: 8 rounds and 8192 tokens |
-| Fast triage | Short runs: 4 rounds, 4096 tokens, and shorter timeouts |
-| Deep audit | Longer runs: 20 rounds, 16000 tokens, reasoning enabled on the target |
+| Fast triage | Short runs: 4 rounds and 4096 tokens |
+| Deep audit | Longer runs: 20 rounds and 16000 tokens |
 
 Runtime controls include automatic mode, rounds, tool availability, logging, judging,
 exit-on-finish, and a resume path.
 
-Attacker, target, judge, and art endpoints can each override:
-
-- Provider and model
-- Protocol and base URL
-- API-key environment variable
-- Provider pins
-- Timeout and modality
-- System-prompt mode and system-prompt file
-- Authentication style
-- Reasoning output
-
-Select **Save advanced settings** to persist these runtime overrides to
-`.wallbreaker_state.json`.
+Provider and agent endpoint overrides are intentionally absent. Select **Save advanced
+settings** to persist runtime preferences to `.wallbreaker_state.json`.
 
 ## Configuration files
 
 | File | Purpose |
 |---|---|
-| `config.toml` | Canonical provider definitions and enabled state |
+| `config.toml` | Canonical providers, agent profiles, and active role assignments |
 | `.env` | Provider API-key values named by `api_key_env` |
-| `.wallbreaker_state.json` | Selected roles, runtime preferences, and advanced overrides |
+| `.wallbreaker_state.json` | Runtime preferences only; it never stores provider endpoints or active roles |
 | `.wallbreaker_models.sqlite3` | Discovered, configured, inferred, and manually entered models |
 | `sessions/run-*.jsonl` | Persistent console and agent run history |
 

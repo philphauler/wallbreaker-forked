@@ -8,8 +8,10 @@ import { Runs } from "./components/Runs";
 import { Arsenal } from "./components/Arsenal";
 import { Settings } from "./components/Settings";
 import { RoleChooser } from "./components/RoleChooser";
+import { Profiles } from "./components/Profiles";
+import { Advanced } from "./components/Advanced";
 
-type Tab = "agent" | "overview" | "console" | "findings" | "runs" | "arsenal" | "settings";
+type Tab = "agent" | "overview" | "console" | "findings" | "runs" | "arsenal" | "profiles" | "advanced" | "settings";
 
 const NAV: { id: Tab; label: string; short: string }[] = [
   { id: "agent", label: "Agent", short: "AG" },
@@ -18,6 +20,8 @@ const NAV: { id: Tab; label: string; short: string }[] = [
   { id: "findings", label: "Findings", short: "FN" },
   { id: "runs", label: "Run logs", short: "RL" },
   { id: "arsenal", label: "Arsenal", short: "AR" },
+  { id: "profiles", label: "Profiles", short: "PR" },
+  { id: "advanced", label: "Advanced", short: "AD" },
   { id: "settings", label: "Settings", short: "ST" },
 ];
 
@@ -108,6 +112,8 @@ export function App() {
           {tab === "runs" && <Runs />}
           {tab === "arsenal" && <Arsenal />}
           {tab === "settings" && <Settings onSaved={refresh} />}
+          {tab === "profiles" && <Profiles onSaved={refresh} />}
+          {tab === "advanced" && <Advanced />}
         </div>
       </div>
     </div>

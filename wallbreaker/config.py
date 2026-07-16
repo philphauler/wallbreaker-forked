@@ -64,6 +64,10 @@ class Endpoint:
     # harness instructions (prompts.compose_system). For claude-code it is passed to the CLI
     # as --system-prompt-file; for API brains it is folded into the system prompt.
     system_prompt_file: str = ""
+    # Inline operator prompt supplied by an agent profile. Provider connection
+    # records never persist this field; it exists only on resolved, run-scoped
+    # endpoints.
+    system_prompt: str = ""
     # anthropic-protocol auth header: "x-api-key" (native Anthropic, default) or "bearer"
     # (Authorization: Bearer <key>) for third-party proxies (tokies.cc etc.) that use the
     # ANTHROPIC_AUTH_TOKEN scheme instead of a native Anthropic key.
@@ -117,6 +121,8 @@ class Config:
     path: Path | None = None
     all_profiles: dict[str, Endpoint] = field(default_factory=dict)
     disabled_profiles: set[str] = field(default_factory=set)
+    agent_profiles: dict[str, dict[str, "AgentProfile"]] = field(default_factory=dict)
+    active_agents: dict[str, "AgentAssignment"] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.all_profiles:
@@ -128,6 +134,24 @@ class Config:
             available = ", ".join(self.profiles) or "(none)"
             raise ConfigError(f"Unknown profile '{key}'. Available: {available}")
         return self.profiles[key]
+
+
+@dataclass
+class AgentProfile:
+    name: str
+    role: str
+    provider: str
+    model: str
+    prompt_source: str = "none"
+    system_prompt: str = ""
+    system_prompt_file: str = ""
+
+
+@dataclass
+class AgentAssignment:
+    profile: str = ""
+    provider: str = ""
+    model: str = ""
 
 
 def doctor_report(config: Config) -> tuple[str, bool]:
@@ -238,6 +262,7 @@ def _endpoint_from_table(name: str, table: dict, *, require_model: bool = False)
         reasoning=bool(table.get("reasoning", False)),
         system_mode=str(table.get("system_mode", "default")).lower(),
         system_prompt_file=str(table.get("system_prompt_file", "")),
+        system_prompt=str(table.get("system_prompt", "")),
         auth_style=str(table.get("auth_style", "x-api-key")).lower(),
         inference_path=str(table.get("inference_path", "")),
         models_path=str(table.get("models_path", "")),
@@ -330,6 +355,63 @@ def load_config(path: str | Path | None = None) -> Config:
     if "art" in data:
         art = _endpoint_from_table("art", data["art"], require_model=True)
 
+    roles = ("attacker", "target", "judge")
+    agent_profiles: dict[str, dict[str, AgentProfile]] = {role: {} for role in roles}
+    raw_agent_profiles = data.get("agent_profiles", {})
+    if isinstance(raw_agent_profiles, dict):
+        for role in roles:
+            role_table = raw_agent_profiles.get(role, {})
+            if not isinstance(role_table, dict):
+                continue
+            for name, table in role_table.items():
+                if not isinstance(table, dict):
+                    continue
+                source = str(table.get("prompt_source", "none")).lower()
+                if source not in ("none", "inline", "file"):
+                    raise ConfigError(f"Agent profile '{role}/{name}' has invalid prompt_source '{source}'")
+                provider_name = str(table.get("provider", "")).strip()
+                model = str(table.get("model", "")).strip()
+                if provider_name not in profiles:
+                    raise ConfigError(f"Agent profile '{role}/{name}' references unknown or disabled provider '{provider_name}'")
+                if not model:
+                    raise ConfigError(f"Agent profile '{role}/{name}' requires a model")
+                inline_prompt = str(table.get("system_prompt", ""))
+                prompt_file = str(table.get("system_prompt_file", ""))
+                if source == "inline" and (not inline_prompt.strip() or prompt_file):
+                    raise ConfigError(f"Agent profile '{role}/{name}' must contain inline text only")
+                if source == "file":
+                    if inline_prompt.strip() or not prompt_file:
+                        raise ConfigError(f"Agent profile '{role}/{name}' must contain a prompt file only")
+                    try:
+                        Path(prompt_file).expanduser().read_text(encoding="utf-8")
+                    except OSError as exc:
+                        raise ConfigError(f"Cannot read system prompt file '{prompt_file}': {exc}") from exc
+                agent_profiles[role][str(name)] = AgentProfile(
+                    name=str(name), role=role, provider=provider_name, model=model,
+                    prompt_source=source,
+                    system_prompt=inline_prompt,
+                    system_prompt_file=prompt_file,
+                )
+
+    active_agents: dict[str, AgentAssignment] = {}
+    agents_table = data.get("agents", {})
+    for role in roles:
+        table = agents_table.get(role, {}) if isinstance(agents_table, dict) else {}
+        if isinstance(table, dict):
+            assignment = AgentAssignment(
+                profile=str(table.get("profile", "")),
+                provider=str(table.get("provider", "")),
+                model=str(table.get("model", "")),
+            )
+            if assignment.profile and assignment.profile not in agent_profiles[role]:
+                raise ConfigError(f"Active {role} profile '{assignment.profile}' does not exist")
+            if not assignment.profile and (assignment.provider or assignment.model):
+                if assignment.provider not in profiles:
+                    raise ConfigError(f"Active {role} assignment references unknown or disabled provider '{assignment.provider}'")
+                if not assignment.model:
+                    raise ConfigError(f"Active {role} assignment requires a model")
+            active_agents[role] = assignment
+
     config = Config(
         default_profile=default_profile,
         profiles=profiles,
@@ -340,6 +422,8 @@ def load_config(path: str | Path | None = None) -> Config:
         path=config_path,
         all_profiles=all_profiles,
         disabled_profiles=disabled_profiles,
+        agent_profiles=agent_profiles,
+        active_agents=active_agents,
     )
     try:
         from .model_catalog import attach_catalog, catalog_path_for

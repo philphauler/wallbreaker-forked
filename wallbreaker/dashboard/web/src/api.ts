@@ -146,6 +146,10 @@ export interface ProviderRecord extends ProfileDetail {
 export interface RoleChoice {
   provider: string;
   model: string;
+  profile: string;
+  custom: boolean;
+  prompt_source: "none" | "inline" | "file";
+  has_system_prompt: boolean;
 }
 
 export type RoleAssignments = Record<"attacker" | "target" | "judge", RoleChoice>;
@@ -181,11 +185,20 @@ export interface EndpointAdvancedSettings {
 
 export interface AdvancedSettings {
   runtime: RuntimeAdvancedSettings;
-  attacker: EndpointAdvancedSettings;
-  target: EndpointAdvancedSettings;
-  judge: EndpointAdvancedSettings;
-  art: EndpointAdvancedSettings;
 }
+
+export type AgentRole = "attacker" | "target" | "judge";
+export interface AgentProfile {
+  name: string;
+  role: AgentRole;
+  provider: string;
+  model: string;
+  prompt_source: "none" | "inline" | "file";
+  system_prompt: string;
+  system_prompt_file: string;
+}
+export interface AgentProfileRoleData { active: RoleChoice; profiles: AgentProfile[] }
+export interface AgentProfilesResponse { roles: Record<AgentRole, AgentProfileRoleData> }
 
 export interface TypicalConfiguration {
   id: string;
@@ -256,9 +269,17 @@ export const api = {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }),
   }),
   roles: () => j<RoleAssignments>("/api/roles"),
-  saveRole: (role: keyof RoleAssignments, body: RoleChoice) => j<RoleChoice>(`/api/roles/${role}`, {
+  saveRole: (role: keyof RoleAssignments, body: { profile?: string; provider?: string; model?: string }) => j<RoleChoice>(`/api/roles/${role}`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   }),
+  agentProfiles: () => j<AgentProfilesResponse>("/api/agent-profiles"),
+  saveAgentProfile: (role: AgentRole, name: string, body: Omit<AgentProfile, "name" | "role">) =>
+    j<AgentProfile>(`/api/agent-profiles/${role}/${encodeURIComponent(name)}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  deleteAgentProfile: (role: AgentRole, name: string) => j<{ ok: boolean }>(
+    `/api/agent-profiles/${role}/${encodeURIComponent(name)}`, { method: "DELETE" },
+  ),
   saveSettings: (body: Record<string, unknown>) =>
     j<Settings>("/api/settings", {
       method: "POST",

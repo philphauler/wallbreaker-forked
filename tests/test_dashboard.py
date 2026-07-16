@@ -322,7 +322,8 @@ def test_settings_get_and_set(tmp_path):
 
     r2 = client.post("/api/settings", json={"judge_model": "openai/gpt-4o-mini"})
     assert r2.json()["judge_model"] == "openai/gpt-4o-mini"
-    assert cfg.target.modality == "image"
+    # Role choices resolve per run and never mutate the provider/global config.
+    assert cfg.target.modality == "text"
 
     r3 = client.post("/api/settings", json={"agent": {"max_rounds": 18, "max_tokens": 12000}})
     assert r3.json()["agent"] == {"max_rounds": 18, "max_tokens": 12000}
@@ -338,9 +339,11 @@ def test_settings_get_and_set(tmp_path):
         }
     })
     assert r4.json()["advanced"]["runtime"]["rounds"] == 16
-    assert cfg.target.base_url == "https://target.example/v1"
-    assert cfg.target.timeout == 45
-    assert cfg.target.provider == ("WandB", "Alibaba")
+    # Obsolete endpoint override bodies are ignored; provider connections remain canonical.
+    assert cfg.target.base_url == "http://x"
+    assert cfg.target.timeout == 0
+    assert cfg.target.provider == ()
+    assert "target" not in r4.json()["advanced"]
 
     r5 = client.post("/api/settings", json={"typical_configuration": "fast_triage"})
     assert r5.json()["agent"] == {"max_rounds": 4, "max_tokens": 4096}
@@ -431,7 +434,7 @@ def test_models_catalog_failure_keeps_current_model(monkeypatch, tmp_path):
 
 def test_target_profile_and_custom_model_persist_together(tmp_path):
     from wallbreaker.config import Config, Endpoint
-    from wallbreaker.state import load_state, state_path_for
+    from wallbreaker.agent_profiles import resolve_role
 
     cfg = Config(
         default_profile="one",
@@ -451,9 +454,10 @@ def test_target_profile_and_custom_model_persist_together(tmp_path):
     assert response.status_code == 200
     assert response.json()["target"]["model"] == "custom-model"
     assert response.json()["target"]["base_url"] == "https://two.example/v1"
-    prefs = load_state(state_path_for(cfg))
-    assert prefs["target_profile"] == "two"
-    assert prefs["target_model"] == "custom-model"
+    resolved_target, _ = resolve_role(cfg, "target")
+    assert resolved_target.base_url == "https://two.example/v1"
+    assert resolved_target.model == "custom-model"
+    assert "[agents.target]" in cfg.path.read_text(encoding="utf-8")
 
     judge_response = client.post(
         "/api/settings",
@@ -461,4 +465,5 @@ def test_target_profile_and_custom_model_persist_together(tmp_path):
     )
     assert judge_response.status_code == 200
     assert judge_response.json()["judge_model"] == "judge-model"
-    assert judge_response.json()["advanced"]["judge"]["base_url"] == "https://two.example/v1"
+    resolved_judge, _ = resolve_role(cfg, "judge")
+    assert resolved_judge.base_url == "https://two.example/v1"

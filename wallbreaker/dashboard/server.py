@@ -35,8 +35,6 @@ TYPICAL_CONFIGURATIONS = [
                 "auto": False, "rounds": 8, "no_tools": False,
                 "exit_on_finish": True, "log": True, "judge": True, "resume": "",
             },
-            "target": {"timeout": 90, "reasoning": False},
-            "judge": {"timeout": 120, "reasoning": False},
         },
     },
     {
@@ -49,8 +47,6 @@ TYPICAL_CONFIGURATIONS = [
                 "auto": False, "rounds": 4, "no_tools": False,
                 "exit_on_finish": True, "log": True, "judge": False, "resume": "",
             },
-            "target": {"timeout": 30, "reasoning": False},
-            "judge": {"timeout": 60, "reasoning": False},
         },
     },
     {
@@ -63,8 +59,6 @@ TYPICAL_CONFIGURATIONS = [
                 "auto": True, "rounds": 20, "no_tools": False,
                 "exit_on_finish": False, "log": True, "judge": True, "resume": "",
             },
-            "target": {"timeout": 180, "reasoning": True},
-            "judge": {"timeout": 180, "reasoning": False},
         },
     },
 ]
@@ -387,11 +381,18 @@ def _web_dist(web_dir: str | Path | None) -> Path | None:
 def _config_summary(config) -> dict:
     if config is None:
         return {"has_target": False, "target": None, "profile": None, "judge": None}
-    target = getattr(config, "target", None)
-    judge = getattr(config, "judge", None)
+    display_config = config
+    roles = {}
+    try:
+        from ..agent_profiles import resolved_config
+        display_config, roles = resolved_config(config)
+    except Exception:
+        pass
+    target = getattr(display_config, "target", None)
+    judge = getattr(display_config, "judge", None)
     prof = None
     try:
-        prof = config.default_profile
+        prof = roles.get("attacker", {}).get("provider", display_config.default_profile)
     except Exception:
         prof = None
     return {
@@ -456,37 +457,8 @@ def _bool_setting(value, default: bool = False) -> bool:
     return bool(value)
 
 
-def _endpoint_to_advanced(endpoint, prefs: dict, prefix: str) -> dict:
-    data = {
-        "protocol": getattr(endpoint, "protocol", "") if endpoint else "",
-        "base_url": getattr(endpoint, "base_url", "") if endpoint else "",
-        "model": getattr(endpoint, "model", "") if endpoint else "",
-        "api_key_env": getattr(endpoint, "api_key_env", "") if endpoint else "",
-        "provider": ",".join(getattr(endpoint, "provider", ()) or ()) if endpoint else "",
-        "timeout": getattr(endpoint, "timeout", 0) if endpoint else 0,
-        "modality": getattr(endpoint, "modality", "text") if endpoint else "text",
-        "reasoning": bool(getattr(endpoint, "reasoning", False)) if endpoint else False,
-        "system_mode": getattr(endpoint, "system_mode", "default") if endpoint else "default",
-        "system_prompt_file": getattr(endpoint, "system_prompt_file", "") if endpoint else "",
-        "auth_style": getattr(endpoint, "auth_style", "x-api-key") if endpoint else "x-api-key",
-    }
-    for field in _ENDPOINT_FIELDS:
-        key = f"{prefix}_{field}"
-        if key in prefs:
-            data[field] = prefs[key]
-    if isinstance(data.get("provider"), list):
-        data["provider"] = ",".join(str(item) for item in data["provider"])
-    return data
-
-
 def _advanced_settings(config, prefs: dict | None = None) -> dict:
     prefs = prefs or {}
-    attacker = None
-    if config is not None and getattr(config, "profiles", None):
-        try:
-            attacker = config.profile()
-        except Exception:
-            attacker = None
     return {
         "runtime": {
             "auto": _bool_setting(prefs.get("auto"), False),
@@ -497,19 +469,7 @@ def _advanced_settings(config, prefs: dict | None = None) -> dict:
             "judge": _bool_setting(prefs.get("judge"), False),
             "resume": str(prefs.get("resume", "")),
         },
-        "attacker": _endpoint_to_advanced(attacker, prefs, "attacker"),
-        "target": _endpoint_to_advanced(getattr(config, "target", None), prefs, "target"),
-        "judge": _endpoint_to_advanced(getattr(config, "judge", None), prefs, "judge"),
-        "art": _endpoint_to_advanced(getattr(config, "art", None), prefs, "art"),
     }
-
-
-def _parse_provider(value) -> list[str]:
-    if isinstance(value, str):
-        return [item.strip() for item in value.split(",") if item.strip()]
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    return []
 
 
 def _store_advanced_settings(prefs: dict, advanced: dict) -> None:
@@ -528,69 +488,6 @@ def _store_advanced_settings(prefs: dict, advanced: dict) -> None:
         prefs["judge"] = _bool_setting(runtime.get("judge"), False)
     if "resume" in runtime:
         prefs["resume"] = str(runtime.get("resume") or "")
-
-    for prefix in _ENDPOINT_PREFIXES:
-        section = advanced.get(prefix)
-        if not isinstance(section, dict):
-            continue
-        for field in _ENDPOINT_FIELDS:
-            if field not in section:
-                continue
-            key = f"{prefix}_{field}"
-            value = section[field]
-            if field == "provider":
-                prefs[key] = _parse_provider(value)
-            elif field == "timeout":
-                prefs[key] = _int_setting(value, 0, 0, 600)
-            elif field == "reasoning":
-                prefs[key] = _bool_setting(value, False)
-            elif field == "modality":
-                prefs[key] = str(value).lower() if str(value).lower() in ("text", "image", "auto") else "text"
-            elif field == "system_mode":
-                prefs[key] = str(value).lower() if str(value).lower() in ("default", "merge", "drop") else "default"
-            elif field == "protocol":
-                prefs[key] = str(value).lower() if str(value).lower() in ("openai", "anthropic", "claude-code") else ""
-            elif field == "auth_style":
-                prefs[key] = str(value).lower() if str(value).lower() in ("x-api-key", "bearer") else "x-api-key"
-            else:
-                prefs[key] = str(value or "")
-
-
-def _replace_endpoint(endpoint, prefix: str, prefs: dict):
-    if endpoint is None:
-        return None
-    updates = {}
-    for field in _ENDPOINT_FIELDS:
-        key = f"{prefix}_{field}"
-        if key not in prefs:
-            continue
-        value = prefs[key]
-        if field == "provider":
-            updates[field] = tuple(_parse_provider(value))
-        elif field == "timeout":
-            updates[field] = float(_int_setting(value, 0, 0, 600))
-        elif field == "reasoning":
-            updates[field] = _bool_setting(value, False)
-        elif field == "modality":
-            mod = str(value).lower()
-            if mod in ("text", "image"):
-                updates[field] = mod
-        elif field == "protocol":
-            protocol = str(value).lower()
-            if protocol in ("openai", "anthropic", "claude-code"):
-                updates[field] = protocol
-        elif field == "system_mode":
-            mode = str(value).lower()
-            if mode in ("default", "merge", "drop"):
-                updates[field] = mode
-        elif field == "auth_style":
-            auth_style = str(value).lower()
-            if auth_style in ("x-api-key", "bearer"):
-                updates[field] = auth_style
-        else:
-            updates[field] = str(value or "").rstrip("/") if field == "base_url" else str(value or "")
-    return dataclasses.replace(endpoint, **updates) if updates else endpoint
-
 
 def _compose_attack_payload(body: dict) -> dict:
     request = str(body.get("request") or body.get("prompt") or "").strip()
@@ -646,48 +543,6 @@ def _compose_attack_payload(body: dict) -> dict:
     }
 
 
-def _apply_settings(config, prefs: dict) -> None:
-    """Apply runtime overrides from a prefs dict onto the live config object: target
-    (model/profile/modality/provider via state.apply_target — re-derives modality from the
-    model so an image model never stays modality='text'), attacker profile + model, judge
-    model. Mutates config in place so every endpoint sees the change immediately."""
-    if config is None:
-        return
-    from ..state import apply_target
-
-    apply_target(config, prefs)
-
-    prof = prefs.get("profile")
-    if isinstance(prof, str) and prof in config.profiles:
-        config.default_profile = prof
-    am = prefs.get("attacker_model")
-    if isinstance(am, str) and am and config.profiles:
-        cur = config.profile()
-        config.profiles[config.default_profile] = dataclasses.replace(cur, model=am)
-    if config.profiles:
-        cur = config.profile()
-        config.profiles[config.default_profile] = _replace_endpoint(cur, "attacker", prefs)
-    judge_profile = prefs.get("judge_profile")
-    if isinstance(judge_profile, str) and judge_profile in config.profiles:
-        source = config.profiles[judge_profile]
-        config.judge = dataclasses.replace(source, name="judge")
-        if hasattr(source, "_catalog_path"):
-            config.judge._catalog_path = source._catalog_path
-            config.judge._provider_id = judge_profile
-    jm = prefs.get("judge_model")
-    if isinstance(jm, str) and jm:
-        if config.judge is not None:
-            config.judge = dataclasses.replace(config.judge, model=jm)
-        elif config.profiles:
-            config.judge = dataclasses.replace(config.profile(), name="judge", model=jm)
-    if config.target is not None:
-        config.target = _replace_endpoint(config.target, "target", prefs)
-    if config.judge is not None:
-        config.judge = _replace_endpoint(config.judge, "judge", prefs)
-    if config.art is not None:
-        config.art = _replace_endpoint(config.art, "art", prefs)
-
-
 def _settings_view(config, prefs: dict | None = None) -> dict:
     agent = _agent_settings(prefs)
     if config is None:
@@ -696,13 +551,20 @@ def _settings_view(config, prefs: dict | None = None) -> dict:
                 "profile_details": {},
                 "advanced": _advanced_settings(None, prefs),
                 "typical_configurations": TYPICAL_CONFIGURATIONS}
+    display_config = config
+    role_view = {}
+    try:
+        from ..agent_profiles import resolved_config
+        display_config, role_view = resolved_config(config)
+    except Exception:
+        pass
     attacker_model = None
     if config.profiles:
         try:
-            attacker_model = config.profile().model
+            attacker_model = display_config.profile().model
         except Exception:
             attacker_model = None
-    tgt = getattr(config, "target", None)
+    tgt = getattr(display_config, "target", None)
     target = None
     if tgt is not None:
         target = {
@@ -710,7 +572,7 @@ def _settings_view(config, prefs: dict | None = None) -> dict:
             "base_url": tgt.base_url, "protocol": tgt.protocol,
             "provider": list(getattr(tgt, "provider", ()) or ()),
         }
-    judge = getattr(config, "judge", None)
+    judge = getattr(display_config, "judge", None)
     return {
         "profiles": list(config.profiles.keys()),
         "profile_details": {
@@ -723,12 +585,12 @@ def _settings_view(config, prefs: dict | None = None) -> dict:
             }
             for name, endpoint in config.profiles.items()
         },
-        "default_profile": config.default_profile,
+        "default_profile": role_view.get("attacker", {}).get("provider", config.default_profile),
         "attacker_model": attacker_model,
         "target": target,
-        "target_profile": prefs.get("target_profile") if isinstance(prefs.get("target_profile"), str) else None,
+        "target_profile": role_view.get("target", {}).get("provider"),
         "judge_model": getattr(judge, "model", None) if judge else None,
-        "judge_profile": prefs.get("judge_profile") if isinstance(prefs.get("judge_profile"), str) else None,
+        "judge_profile": role_view.get("judge", {}).get("provider"),
         "agent": agent,
         "advanced": _advanced_settings(config, prefs),
         "typical_configurations": TYPICAL_CONFIGURATIONS,
@@ -823,11 +685,14 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
     console_runlog = RunLog(directory=str(sessions))
     provider_registry = None
     model_catalog = None
+    agent_profile_registry = None
     if config is not None:
         try:
             from ..provider_registry import ProviderRegistry
 
             provider_registry = ProviderRegistry(config)
+            from ..agent_profiles import AgentProfileRegistry
+            agent_profile_registry = AgentProfileRegistry(config)
             from ..model_catalog import ModelCatalog, catalog_path_for
 
             model_catalog = ModelCatalog(catalog_path_for(config))
@@ -840,11 +705,15 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             obsolete_keys = {
                 "research_profile", "research_model",
                 "research_agent_max_rounds", "research_agent_max_tokens",
+                "profile", "target_profile", "judge_profile",
+                "target_provider", "target_modality",
             }
+            obsolete_keys.update(
+                f"{prefix}_{field}" for prefix in _ENDPOINT_PREFIXES for field in _ENDPOINT_FIELDS
+            )
             if obsolete_keys.intersection(prefs):
                 prefs = {key: value for key, value in prefs.items() if key not in obsolete_keys}
                 save_state(state_path, prefs)
-            _apply_settings(config, prefs)
         except Exception:
             pass
     app = FastAPI(title="Wallbreaker", version="0.1.0")
@@ -932,61 +801,63 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             result["refreshed_at"] = model_catalog.mark_refreshed(name)
         return {"ok": bool(result["fetched"]), **result}
 
-    def _roles_view(prefs: dict) -> dict:
-        roles = {}
-        role_keys = {
-            "attacker": ("profile", "attacker_model"),
-            "target": ("target_profile", "target_model"),
-            "judge": ("judge_profile", "judge_model"),
-        }
-        for role, (profile_key, model_key) in role_keys.items():
-            profile = prefs.get(profile_key)
-            if not isinstance(profile, str) or profile not in getattr(config, "profiles", {}):
-                profile = getattr(config, "default_profile", None)
-            endpoint = config.profiles.get(profile) if config is not None and profile else None
-            model = prefs.get(model_key) or getattr(endpoint, "model", "")
-            if role == "target" and getattr(config, "target", None) is not None:
-                model = prefs.get(model_key) or config.target.model
-            if role == "judge" and getattr(config, "judge", None) is not None:
-                model = prefs.get(model_key) or config.judge.model
-            roles[role] = {"provider": profile, "model": model}
-        return roles
+    def _roles_view() -> dict:
+        if agent_profile_registry is None:
+            return {}
+        return {role: data["active"] for role, data in agent_profile_registry.view()["roles"].items()}
 
     @app.get("/api/roles")
     def roles_get():
         if config is None:
             return {}
-        from ..state import load_state, state_path_for
-
-        return _roles_view(load_state(state_path_for(config)))
+        return _roles_view()
 
     @app.put("/api/roles/{role}")
     def role_put(role: str, body: dict):
         if config is None:
             raise HTTPException(status_code=400, detail="no config loaded")
-        keys = {
-            "attacker": ("profile", "attacker_model"),
-            "target": ("target_profile", "target_model"),
-            "judge": ("judge_profile", "judge_model"),
-        }
-        if role not in keys:
+        if agent_profile_registry is None:
+            raise HTTPException(status_code=400, detail="no config loaded")
+        if role not in ("attacker", "target", "judge"):
             raise HTTPException(status_code=404, detail=f"unknown role '{role}'")
-        provider = str(body.get("provider") or "")
-        model = str(body.get("model") or "").strip()
-        if provider not in config.profiles:
-            raise HTTPException(status_code=400, detail=f"unknown provider '{provider}'")
-        if not model:
-            raise HTTPException(status_code=400, detail="model is required")
-        from ..state import load_state, save_state, state_path_for
+        try:
+            return agent_profile_registry.activate(role, body)
+        except Exception as exc:
+            from ..config import ConfigError
+            if isinstance(exc, ConfigError):
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise
 
-        path = state_path_for(config)
-        prefs = load_state(path)
-        provider_key, model_key = keys[role]
-        prefs[provider_key] = provider
-        prefs[model_key] = model
-        save_state(path, prefs)
-        _apply_settings(config, prefs)
-        return _roles_view(prefs)[role]
+    @app.get("/api/agent-profiles")
+    def agent_profiles_get():
+        return agent_profile_registry.view() if agent_profile_registry is not None else {"roles": {}}
+
+    @app.put("/api/agent-profiles/{role}/{name}")
+    def agent_profile_put(role: str, name: str, body: dict):
+        if agent_profile_registry is None:
+            raise HTTPException(status_code=400, detail="no config loaded")
+        try:
+            return dataclasses.asdict(agent_profile_registry.save(role, name, body))
+        except Exception as exc:
+            from ..config import ConfigError
+            if isinstance(exc, ConfigError):
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise
+
+    @app.delete("/api/agent-profiles/{role}/{name}")
+    def agent_profile_delete(role: str, name: str):
+        if agent_profile_registry is None:
+            raise HTTPException(status_code=400, detail="no config loaded")
+        try:
+            agent_profile_registry.delete(role, name)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="unknown agent profile") from exc
+        except Exception as exc:
+            from ..config import ConfigError
+            if isinstance(exc, ConfigError):
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise
+        return {"ok": True}
 
     @app.get("/api/models")
     async def models_get(profile: str):
@@ -1056,49 +927,25 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
         prefs = load_state(state_path_for(config))
 
-        has_target_profile = bool(body.get("target_profile"))
-        has_target_model = bool(body.get("target_model"))
-        if has_target_profile:
-            name = str(body["target_profile"])
-            if name not in config.profiles:
-                raise HTTPException(status_code=400, detail=f"unknown profile '{name}'")
-            prefs["target_profile"] = name
-            if not has_target_model:
-                prefs.pop("target_model", None)
-        if has_target_model:
-            prefs["target_model"] = str(body["target_model"])
-            if not has_target_profile:
-                prefs.pop("target_profile", None)
-        if "target_modality" in body and body["target_modality"]:
-            mod = str(body["target_modality"]).lower()
-            if mod in ("text", "image"):
-                prefs["target_modality"] = mod
-            elif mod == "auto":
-                prefs.pop("target_modality", None)
-        if "target_provider" in body:
-            prov = body["target_provider"]
-            prefs["target_provider"] = list(prov) if isinstance(prov, list) else []
-        if body.get("attacker_profile"):
-            name = str(body["attacker_profile"])
-            if name not in config.profiles:
-                raise HTTPException(status_code=400, detail=f"unknown profile '{name}'")
-            prefs["profile"] = name
-            prefs.pop("attacker_model", None)
-        if body.get("attacker_model"):
-            prefs["attacker_model"] = str(body["attacker_model"])
-        has_judge_profile = bool(body.get("judge_profile"))
-        has_judge_model = bool(body.get("judge_model"))
-        if has_judge_profile:
-            name = str(body["judge_profile"])
-            if name not in config.profiles:
-                raise HTTPException(status_code=400, detail=f"unknown profile '{name}'")
-            prefs["judge_profile"] = name
-            if not has_judge_model:
-                prefs.pop("judge_model", None)
-        if has_judge_model:
-            prefs["judge_model"] = str(body["judge_model"])
-            if not has_judge_profile:
-                prefs.pop("judge_profile", None)
+        # Older settings clients submit provider/model pairs here. Persist them
+        # through the same canonical Custom assignment used by the header.
+        for role, provider_key, model_key in (
+            ("attacker", "attacker_profile", "attacker_model"),
+            ("target", "target_profile", "target_model"),
+            ("judge", "judge_profile", "judge_model"),
+        ):
+            if provider_key not in body and model_key not in body:
+                continue
+            try:
+                current = agent_profile_registry.view()["roles"][role]["active"]
+                provider = str(body.get(provider_key) or current["provider"])
+                model = str(body.get(model_key) or current["model"])
+                agent_profile_registry.activate(role, {"provider": provider, "model": model})
+            except Exception as exc:
+                from ..config import ConfigError
+                if isinstance(exc, ConfigError):
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+                raise
         agent = body.get("agent") if isinstance(body.get("agent"), dict) else body
         if "agent_max_rounds" in agent:
             prefs["agent_max_rounds"] = _int_setting(agent.get("agent_max_rounds"), 8, 1, 50)
@@ -1120,7 +967,6 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             _store_advanced_settings(prefs, preset["advanced"])
 
         save_state(state_path_for(config), prefs)
-        _apply_settings(config, prefs)
         return _settings_view(config, prefs)
 
     @app.get("/api/overview")
@@ -1257,7 +1103,7 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
     @app.post("/api/fire")
     async def fire(body: dict):
-        if config is None or getattr(config, "target", None) is None:
+        if config is None:
             raise HTTPException(status_code=400, detail="no [target] configured in config.toml")
         try:
             composed = _compose_attack_payload(body)
@@ -1274,25 +1120,35 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             args["system"] = composed["system"]
 
         from ..tools import build_registry
+        from ..agent_profiles import resolved_config
         from ..session import inference_logging
 
-        reg = build_registry(config)
+        try:
+            run_config, role_meta = resolved_config(config)
+        except Exception as exc:
+            from ..config import ConfigError
+            if isinstance(exc, ConfigError):
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise
+        reg = build_registry(run_config)
         if not console_runlog._started:
             console_runlog.set_run_meta(
                 source="dashboard_console",
-                models=run_models_meta(config, attacker=None),
+                models=run_models_meta(run_config, attacker=run_config.profile()),
+                agent_roles=role_meta,
             )
         console_runlog.event(
             "console_request",
             request_body=body,
             composed=composed,
+            agent_roles=role_meta,
             tool="query_target",
             tool_args=args,
         )
         with inference_logging(console_runlog):
             result = await reg.execute("query_target", args)
         verdict = _extract_verdict(result.content)
-        target = getattr(config, "target", None)
+        target = run_config.target
         console_runlog.event(
             "attack_fire",
             request=composed["request"],
@@ -1308,6 +1164,7 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
             max_tokens=composed["max_tokens"],
             target_model=getattr(target, "model", "") if target else "",
             target_base_url=getattr(target, "base_url", "") if target else "",
+            agent_roles=role_meta,
         )
         return {
             **composed,
@@ -1324,12 +1181,14 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
     async def agent_run(body: dict):
         from fastapi.responses import StreamingResponse
 
-        if config is None or getattr(config, "target", None) is None:
+        if config is None:
             raise HTTPException(status_code=400, detail="no [target] configured in config.toml")
         try:
-            brain = config.profile()
-        except Exception:
-            raise HTTPException(status_code=400, detail="no attacker profile configured")
+            from ..agent_profiles import resolved_config
+            run_config, role_meta = resolved_config(config)
+            brain = run_config.profile()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if brain is None:
             raise HTTPException(status_code=400, detail="no attacker profile configured")
         objective = str(body.get("objective") or "").strip()
@@ -1350,17 +1209,18 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
         from ..agent.loop import AgentEvents, run_autonomous
         from ..agent.messages import user
-        from ..prompts import DEFAULT_SYSTEM
+        from ..prompts import compose_system
         from ..providers.factory import build_provider
         from ..session import RunLog, run_models_meta
         from ..tools import build_registry
 
         provider = build_provider(brain)
-        registry = build_registry(config)
+        registry = build_registry(run_config)
         runlog = RunLog(directory=str(sessions))
         runlog.set_run_meta(
             source="dashboard_agent",
-            models=run_models_meta(config, attacker=brain),
+            models=run_models_meta(run_config, attacker=brain),
+            agent_roles=role_meta,
             agent={"max_rounds": max_rounds, "max_tokens": max_tokens},
         )
         queue: asyncio.Queue = asyncio.Queue()
@@ -1439,7 +1299,7 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
                 try:
                     with inference_logging(runlog):
                         res = await run_autonomous(
-                            provider, registry, history, system=DEFAULT_SYSTEM,
+                            provider, registry, history, system=compose_system(brain),
                             events=events, max_rounds=max_rounds, max_tokens=max_tokens,
                         )
                     data = res.data or {}
@@ -1458,7 +1318,7 @@ def create_app(config=None, sessions_dir: str | Path = "sessions", web_dir: str 
 
         async def gen():
             push({"type": "start", "objective": objective, "brain": getattr(brain, "model", ""),
-                  "target": getattr(config.target, "model", ""),
+                  "target": getattr(run_config.target, "model", ""),
                   "max_rounds": max_rounds, "max_tokens": max_tokens,
                   "run_log": runlog.path.name})
             try:

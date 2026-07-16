@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type RoleAssignments, type RoleChoice } from "../api";
+import { api, type AgentProfile, type RoleAssignments, type RoleChoice } from "../api";
 import { ModelChooser } from "./ModelChooser";
 import { ProviderChooser } from "./ProviderChooser";
 
@@ -16,31 +16,45 @@ export function RoleChooser({
   const [model, setModel] = useState(value.model);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { setProvider(value.provider); setModel(value.model); }, [value]);
+  const [profiles, setProfiles] = useState<AgentProfile[]>([]);
+  const [profile, setProfile] = useState(value.profile || "");
+  useEffect(() => { setProvider(value.provider); setModel(value.model); setProfile(value.profile || ""); }, [value]);
+  useEffect(() => { if (open) api.agentProfiles().then((data) => setProfiles(data.roles[role]?.profiles || [])).catch(() => setProfiles([])); }, [open, role]);
   useEffect(() => {
     const close = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
   const save = async () => {
-    if (!provider || !model.trim()) return;
+    if (!profile && (!provider || !model.trim())) return;
     setBusy(true); setError("");
-    try { await api.saveRole(role, { provider, model: model.trim() }); setOpen(false); onSaved(); }
+    try { await api.saveRole(role, profile ? { profile } : { provider, model: model.trim() }); setOpen(false); onSaved(); }
     catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
   return (
     <div className="role-chooser" ref={root}>
       <button type="button" className="role-chip" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span>{role}</span><b>{value.model || "not set"}</b><small>{value.provider}</small>
+        <span>{role}</span><b>{value.model || "not set"}</b><small>{value.profile || `Custom · ${value.provider}`}</small>
       </button>
       {open && <div className="role-menu">
-        <label>Provider</label>
-        <ProviderChooser value={provider} ariaLabel={`${role} provider`} onChange={(next, item) => { setProvider(next); if (item) setModel(item.model); }} />
-        <label>Model</label>
-        <ModelChooser profile={provider} value={model} onChange={setModel} ariaLabel={`${role} model`} />
+        <label>Agent profile</label>
+        <select value={profile} onChange={(event) => {
+          const next = event.target.value; setProfile(next);
+          const selected = profiles.find((item) => item.name === next);
+          if (selected) { setProvider(selected.provider); setModel(selected.model); }
+        }}>
+          <option value="">Custom</option>
+          {profiles.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+        </select>
+        {!profile && <>
+          <label>Provider</label>
+          <ProviderChooser value={provider} ariaLabel={`${role} provider`} onChange={(next, item) => { setProvider(next); if (item) setModel(item.model); }} />
+          <label>Model</label>
+          <ModelChooser profile={provider} value={model} onChange={setModel} ariaLabel={`${role} model`} />
+        </>}
         {error && <div className="err">{error}</div>}
-        <button type="button" className="primary-command" disabled={busy || !model.trim()} onClick={() => void save()}>Apply</button>
+        <button type="button" className="primary-command" disabled={busy || (!profile && !model.trim())} onClick={() => void save()}>Apply</button>
       </div>}
     </div>
   );

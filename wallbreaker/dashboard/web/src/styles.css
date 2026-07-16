@@ -212,6 +212,20 @@ tr:hover td { background: var(--panel); }
   font-size: 11px;
 }
 
+.agent-profile-grid { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.settings-role-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.agent-profile-card { min-width: 0; }
+.profile-active { color: var(--muted); margin-bottom: 14px; overflow-wrap: anywhere; }
+.profile-list { display: grid; gap: 7px; margin-bottom: 18px; }
+.profile-list-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: stretch; }
+.profile-select { display: grid; gap: 3px; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); padding: 9px; min-width: 0; }
+.profile-select span, .profile-select small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-editor { border-top: 1px solid var(--border); padding-top: 12px; }
+.profile-prompt { min-height: 180px; resize: vertical; width: 100%; }
+.profile-actions { display: flex; gap: 8px; margin-top: 12px; }
+.danger { color: var(--bad); }
+@media (max-width: 1200px) { .agent-profile-grid { grid-template-columns: 1fr; } }
+
 /* ---- findings ---- */
 .findings-layout {
   display: grid;

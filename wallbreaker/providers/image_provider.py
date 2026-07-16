@@ -199,6 +199,8 @@ class OpenRouterImageProvider(Provider):
         system: str | None = None,
         max_tokens: int = 4096,
     ) -> ImageResult:
+        if not system:
+            system = str(getattr(self.endpoint, "system_prompt", "") or "") or None
         data = await self._post_chat(
             self._payload(_messages_to_wire(messages, system), max_tokens)
         )
@@ -223,6 +225,8 @@ class OpenRouterImageProvider(Provider):
         like the vision judge does. This is the black-box surface for Chain-of-Jailbreak /
         Semantic-Chaining edit ladders where the harm accumulates across benign edit turns.
         """
+        if not system:
+            system = str(getattr(self.endpoint, "system_prompt", "") or "") or None
         wire = _edit_wire(turns, system)
         data = await self._post_chat(self._payload(wire, max_tokens))
         images, data_urls, text = _extract_images(data)

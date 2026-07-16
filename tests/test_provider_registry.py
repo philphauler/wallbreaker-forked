@@ -165,8 +165,14 @@ def test_roles_are_independent_and_persisted(tmp_path):
     assert client.put("/api/roles/attacker", json={"provider": "other", "model": "attack-x"}).status_code == 200
     assert client.put("/api/roles/target", json={"provider": "base", "model": "target-x"}).status_code == 200
     roles = client.get("/api/roles").json()
-    assert roles["attacker"] == {"provider": "other", "model": "attack-x"}
-    assert roles["target"] == {"provider": "base", "model": "target-x"}
+    assert roles["attacker"]["provider"] == "other"
+    assert roles["attacker"]["model"] == "attack-x"
+    assert roles["attacker"]["custom"] is True
+    assert roles["target"]["provider"] == "base"
+    assert roles["target"]["model"] == "target-x"
+    text = cfg.path.read_text(encoding="utf-8")
+    assert "[agents.attacker]" in text
+    assert 'provider = "other"' in text
     assert set(roles) == {"attacker", "target", "judge"}
     assert client.put("/api/roles/research", json={
         "provider": "other", "model": "unused",
@@ -185,7 +191,7 @@ def test_dashboard_removes_obsolete_provider_research_state(tmp_path):
     }), encoding="utf-8")
 
     TestClient(create_app(config=cfg, sessions_dir=tmp_path / "sessions"))
-    assert json.loads(state_path.read_text(encoding="utf-8")) == {"profile": "base"}
+    assert json.loads(state_path.read_text(encoding="utf-8")) == {}
 
 
 def test_provider_validation_and_localhost_cors(tmp_path):

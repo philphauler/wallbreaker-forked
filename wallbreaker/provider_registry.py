@@ -186,6 +186,8 @@ class ProviderRegistry:
         current = self.config.all_profiles.get(name)
         endpoint = _normalize(name, body, current)
         enabled = bool(body.get("enabled", name not in self.config.disabled_profiles))
+        if not enabled:
+            self._require_unreferenced(name)
         if not enabled and name in self.config.profiles and len(self.config.profiles) == 1:
             raise ConfigError("At least one provider must remain enabled")
         api_key = str(body.get("api_key") or "")
@@ -209,9 +211,22 @@ class ProviderRegistry:
             raise KeyError(name)
         if name in self.config.profiles and len(self.config.profiles) == 1:
             raise ConfigError("At least one provider must remain enabled")
+        self._require_unreferenced(name)
         self.config.all_profiles.pop(name)
         self.config.profiles.pop(name, None)
         self.config.disabled_profiles.discard(name)
         if self.config.default_profile == name and self.config.profiles:
             self.config.default_profile = next(iter(self.config.profiles))
         _persist_profile(self.config, name, None)
+
+    def _require_unreferenced(self, name: str) -> None:
+        references = []
+        for role, profiles in self.config.agent_profiles.items():
+            references.extend(f"{role}/{profile.name}" for profile in profiles.values() if profile.provider == name)
+        for role, assignment in self.config.active_agents.items():
+            if not assignment.profile and assignment.provider == name:
+                references.append(f"active {role}")
+        if references:
+            raise ConfigError(
+                f"Provider '{name}' is used by {', '.join(references)}. Reassign those agents before disabling or removing it."
+            )

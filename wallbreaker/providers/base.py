@@ -138,6 +138,8 @@ class Provider(ABC):
             trace_inference_event, trace_inference_request, trace_inference_response,
         )
 
+        if not system:
+            system = str(getattr(self.endpoint, "system_prompt", "") or "") or None
         text_chunks: list[str] = []
         reasoning_chunks: list[str] = []
         usage_events: list[dict] = []

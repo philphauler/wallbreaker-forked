@@ -597,6 +597,9 @@ def compose_system(endpoint, base: str | None = None) -> str:
     double it here for that protocol.
     """
     base = base if base is not None else DEFAULT_SYSTEM
+    inline = str(getattr(endpoint, "system_prompt", "") or "").strip()
+    if inline:
+        return inline + "\n\n" + base
     if getattr(endpoint, "protocol", "") == "claude-code":
         return base
     spf = (
