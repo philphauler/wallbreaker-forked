@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import dataclasses
 import difflib
+import re
 import shlex
+from datetime import datetime
 
+from rich.text import Text
 from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
-from textual.widgets import Footer, Input, Static
+from textual.widgets import Footer, Input, OptionList, Static
+from textual.widgets.option_list import Option
 
 
 class PromptInput(Input):
@@ -23,6 +27,21 @@ class PromptInput(Input):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.buffer: list[str] = []
+
+    def _refresh_preview(self) -> None:
+        """Mirror the buffered (non-editable) lines into the visible compose preview."""
+        try:
+            preview = self.app.query_one("#compose-preview", Static)
+        except Exception:
+            return
+        if self.buffer:
+            n = len(self.buffer) + 1
+            preview.border_title = f"composing · {n} lines"
+            preview.remove_class("hidden")
+            preview.update("\n".join(self.buffer))
+        else:
+            preview.add_class("hidden")
+            preview.update("")
 
     def _on_paste(self, event: events.Paste) -> None:
         # Textual dispatches _on_paste to EVERY class in the MRO, so without this the base
@@ -52,6 +71,7 @@ class PromptInput(Input):
         self.value = last
         self.cursor_position = len(last)
         self._sync_subtitle()
+        self._refresh_preview()
 
     def soft_newline(self) -> None:
         """Commit the current line to the buffer and start a fresh editable line."""
@@ -59,6 +79,7 @@ class PromptInput(Input):
         self.value = ""
         self.cursor_position = 0
         self._sync_subtitle()
+        self._refresh_preview()
 
     def full_text(self) -> str:
         """The whole composed message: buffered lines joined with the editable line."""
@@ -70,6 +91,7 @@ class PromptInput(Input):
         self.buffer = []
         self.value = ""
         self._sync_subtitle()
+        self._refresh_preview()
 
     def _sync_subtitle(self) -> None:
         n = len(self.buffer)
@@ -89,9 +111,9 @@ from ..transforms import list_transforms
 from . import widgets
 from .header import StatusHeader
 from .sidebar import StatsPanel
-from .theme import WB_THEME
+from .theme import PALETTE, WB_THEME
 
-HELP_TEXT = """Slash commands:
+HELP_TEXT = """☠ RTFM // TEH SL45H K0MM4NDZ, D00D ☠
 /help [topic]         show this help, or only lines matching a topic
 /edit [new text]      rewind to your last message; prefill it to edit, or
                       pass new text to replace and resend it
@@ -130,6 +152,9 @@ HELP_TEXT = """Slash commands:
 /harmbench [category]      standardized HarmBench behavior prompts (unbiased battery)
 /campaign [category] [n]   auto-escalate a battery up the technique ladder, coverage matrix
 /leaderboard [profiles..]  rank profiles by ASR on one battery (robustness benchmark)
+/swarm [@a,b] <objective>  vote/best-of: many attacker brains author + fire once, best break wins
+/swarm siege [@a,b] <obj>  COLLABORATIVE multi-round: models share one escalating thread + adapt off refusals until it cracks
+/swarm roster              show each attacker's per-model jailbreak status (armed/generic)
 /find <term>               search the conversation transcript for a term
 /leakscan                  scan the last target reply for secrets/PII/system-prompt echo
 /log [on|off]         toggle the JSONL run log (every payload + verdict)
@@ -144,6 +169,8 @@ HELP_TEXT = """Slash commands:
 /repro [n]            emit a copy-paste repro pack for the Nth bypass (or latest)
 /report [html] [path] write a findings report (markdown, or html for a styled scoreboard)
 /session save|load [path]   persist or reload the whole engagement
+                      (bare /session load opens a picker — no path to paste)
+/resume [path]        reopen a past session — picker if no path (alias for /session load)
                       (the session also autosaves each turn; relaunch with wallbreaker --resume)
 /save [path]          save a plain-text transcript
 /clear                clear the conversation
@@ -166,17 +193,66 @@ KNOWN_COMMANDS = (
     "/help", "/edit", "/retry", "/regen", "/undo", "/clear", "/profile", "/target",
     "/provider", "/validate", "/replay", "/model", "/auto", "/autoexit", "/rounds",
     "/transforms", "/encode", "/diff", "/tools", "/preset", "/lib", "/parsel", "/eni", "/harmbench",
-    "/campaign", "/leaderboard", "/seedsweep", "/pairsweep", "/narrate", "/fire", "/push",
+    "/campaign", "/leaderboard", "/swarm", "/seedsweep", "/pairsweep", "/narrate", "/fire", "/push",
     "/adapt", "/firefile", "/find", "/leakscan", "/log", "/judge", "/asr", "/stats",
     "/regrade",
     "/objective", "/template", "/sysprompt", "/findings", "/export", "/repro",
-    "/report", "/session", "/save", "/quit", "/exit",
+    "/report", "/session", "/resume", "/save", "/quit", "/exit",
 )
 
 
 def suggest_command(cmd: str, known=KNOWN_COMMANDS) -> str | None:
     matches = difflib.get_close_matches(cmd, known, n=1, cutoff=0.6)
     return matches[0] if matches else None
+
+
+def _parse_command_hints(help_text: str, known) -> dict[str, str]:
+    """Map each /command to its one-line hint, harvested from HELP_TEXT.
+
+    HELP_TEXT rows are ``/<cmd> <usage>   <description>`` — usage and description
+    are separated by a run of 2+ spaces, so a single split recovers the hint
+    without a second source of truth to drift out of sync.
+    """
+    known = set(known)
+    hints: dict[str, str] = {}
+    for line in help_text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("/"):
+            continue
+        parts = re.split(r"\s{2,}", stripped, maxsplit=1)
+        cmd = parts[0].split()[0].lower()
+        hint = parts[1].strip() if len(parts) > 1 else ""
+        # skip empty hints so a single-space-aligned row falls through to overrides
+        if cmd in known and cmd not in hints and hint:
+            hints[cmd] = hint
+    return hints
+
+
+# A handful of help rows use single-space column alignment (their usage string is
+# long), so the 2+-space split can't recover a hint — supply those by hand, plus
+# the pure aliases that have no dedicated help row of their own.
+_HINT_OVERRIDES = {
+    "/regen": "regenerate the response to your last message",
+    "/exit": "exit",
+    "/eni": "browse the ENI persona-jailbreak collection",
+    "/adapt": "tailor an ENI/L1B3RT4S persona to the target, fire it, open a thread",
+    "/sysprompt": "hold ONE fixed system prompt (or load a raw persona)",
+    "/report": "write a findings report (markdown, or html for a scoreboard)",
+}
+
+COMMAND_HINTS = _parse_command_hints(HELP_TEXT, KNOWN_COMMANDS)
+for _cmd, _hint in _HINT_OVERRIDES.items():
+    COMMAND_HINTS.setdefault(_cmd, _hint)
+
+
+def command_matches(prefix: str, known=KNOWN_COMMANDS) -> list[str]:
+    """Commands to offer for a partially-typed ``/prefix`` (prefix-first, order-stable)."""
+    p = prefix.lower()
+    starts = [c for c in known if c.startswith(p)]
+    if starts:
+        return starts
+    needle = p[1:]
+    return [c for c in known if needle and needle in c]
 
 
 class RthApp(App):
@@ -222,8 +298,14 @@ class RthApp(App):
         self._run_timer = None
         self._input_history: list[str] = []
         self._hist_pos: int | None = None
+        self._cmd_menu_open = False
+        self._cmd_menu_items: list[str] = []
+        self._session_picker_open = False
+        self._session_picker_items: list[str] = []
         self.runlog = RunLog()
         self.runlog.enabled = bool(prefs.get("log", True))
+        if config.target:
+            self.runlog.target_model = config.target.model
         self.tokens_in = 0
         self.tokens_out = 0
         self.asr_hits = 0
@@ -308,13 +390,22 @@ class RthApp(App):
 
     def _sync_judge_endpoint(self) -> None:
         self.registry.ctx.judge_endpoint = self._judge_endpoint()
+        self._sync_vault_meta()
+
+    def _sync_vault_meta(self) -> None:
+        """Keep the BreakVault foldering under the live objective + attacker model."""
+        self.registry.ctx.current_objective = self.objective
+        self.registry.ctx.attacker_model = getattr(self.endpoint, "model", "") or ""
 
     def compose(self) -> ComposeResult:
         yield StatusHeader(id="header")
         with Horizontal(id="body"):
             yield VerticalScroll(id="log")
             yield StatsPanel(id="sidebar")
-        yield PromptInput(placeholder="message, /help — paste multi-line, ctrl+j adds a line", id="prompt")
+        yield OptionList(id="session-picker", classes="hidden")
+        yield OptionList(id="command-menu", classes="hidden")
+        yield Static("", id="compose-preview", classes="hidden")
+        yield PromptInput(placeholder="TYP3 UR H4X, D00D  ▪  /help = RTFM  ▪  ctrl+j = m04R L1N3Z", id="prompt")
         yield Footer()
 
     def action_toggle_sidebar(self) -> None:
@@ -327,6 +418,7 @@ class RthApp(App):
         self.registry.ctx.progress = self._tool_progress
         self.registry.ctx.record = self._tool_verdict
         self.registry.ctx.run_events = self._run_sink
+        self.registry.ctx.tool_logger = self._log_tool
         self._sync_judge_endpoint()
         self.query_one("#prompt", Input).focus()
         if self.config.mcp_servers:
@@ -493,6 +585,15 @@ class RthApp(App):
         )
 
     def _refresh_status(self) -> None:
+        # keep the run log's target stamp current so a saved run is labelled by
+        # its model in the /session load picker
+        if self.config.target:
+            self.runlog.target_model = self.config.target.model
+            self.runlog.target_profile = (
+                self._target_profile
+                or getattr(self.config.target, "name", "")
+                or ""
+            )
         judge = "judge" if self.judge_enabled else "heur"
         tokens = f"{self.tokens_in}>{self.tokens_out}"
         header = self.query_one("#header", StatusHeader)
@@ -541,7 +642,68 @@ class RthApp(App):
             self._assistant = Static(widgets.assistant_panel("", self.endpoint.model))
             self._log.mount(self._assistant)
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "prompt":
+            self._refresh_command_menu(event.value)
+
+    def _refresh_command_menu(self, value: str) -> None:
+        """Show/refresh the slash-command autocomplete popup for the current input."""
+        try:
+            menu = self.query_one("#command-menu", OptionList)
+        except Exception:
+            return
+        # lstrip only — a TRAILING space means the command name is finished
+        # (e.g. "/session ") and the popup should close, not re-open.
+        v = value.lstrip()
+        matches = command_matches(v) if v.startswith("/") and " " not in v else []
+        if not matches:
+            self._close_command_menu()
+            return
+        self._cmd_menu_items = matches
+        menu.clear_options()
+        for c in matches:
+            hint = COMMAND_HINTS.get(c, "")
+            label = Text()
+            label.append(f"{c:<20}", style=f"bold {PALETTE['accent']}")
+            if hint:
+                label.append(hint, style=PALETTE["label"])
+            menu.add_option(Option(label, id=c))
+        menu.border_title = "c0mm4ndz · tab=c0mpl3t3 · esc=cl0se"
+        menu.remove_class("hidden")
+        menu.highlighted = 0
+        self._cmd_menu_open = True
+
+    def _close_command_menu(self) -> None:
+        self._cmd_menu_open = False
+        self._cmd_menu_items = []
+        try:
+            menu = self.query_one("#command-menu", OptionList)
+        except Exception:
+            return
+        menu.add_class("hidden")
+        menu.clear_options()
+
+    def _accept_command_menu(self) -> bool:
+        """Drop the highlighted command into the prompt, ready for its args."""
+        if not self._cmd_menu_open or not self._cmd_menu_items:
+            return False
+        menu = self.query_one("#command-menu", OptionList)
+        idx = menu.highlighted if menu.highlighted is not None else 0
+        idx = max(0, min(idx, len(self._cmd_menu_items) - 1))
+        cmd = self._cmd_menu_items[idx]
+        inp = self.query_one("#prompt", Input)
+        inp.value = cmd + " "
+        inp.cursor_position = len(inp.value)
+        self._close_command_menu()
+        inp.focus()
+        return True
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        # Enter while the autocomplete popup is up accepts the highlighted command
+        # instead of firing a half-typed one.
+        if self._cmd_menu_open:
+            self._accept_command_menu()
+            return
         inp = event.input
         raw = inp.full_text() if isinstance(inp, PromptInput) else event.value
         text = raw.strip()
@@ -588,9 +750,39 @@ class RthApp(App):
         self._hist_pos = None
 
     def on_key(self, event) -> None:
+        # the session picker owns focus while open; let esc back out of it
+        if self._session_picker_open:
+            if event.key == "escape":
+                self._close_session_picker()
+                event.prevent_default()
+                event.stop()
+            return
         inp = self.query_one("#prompt", Input)
         if not inp.has_focus:
             return
+        # slash-command autocomplete: drive the popup while it's up
+        if self._cmd_menu_open:
+            menu = self.query_one("#command-menu", OptionList)
+            if event.key == "down":
+                menu.action_cursor_down()
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key == "up":
+                menu.action_cursor_up()
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key == "tab":
+                self._accept_command_menu()
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key == "escape":
+                self._close_command_menu()
+                event.prevent_default()
+                event.stop()
+                return
         if event.key == "ctrl+j" and isinstance(inp, PromptInput):
             inp.soft_newline()
             event.prevent_default()
@@ -702,6 +894,7 @@ class RthApp(App):
 
         events = AgentEvents(
             on_text=self._on_text,
+            on_reasoning=self._on_reasoning,
             on_tool_start=self._on_tool_start,
             on_tool_result=self._on_tool_result,
             on_turn_end=self._on_turn_end,
@@ -755,7 +948,7 @@ class RthApp(App):
         self._assistant = None
         self._round_label = f"{rnd}/{total}"
         self._refresh_status()
-        self._mount(widgets.info_panel(f"round {rnd}/{total}", title="autonomous"))
+        self._mount(widgets.info_panel(f"R0UND {rnd}/{total}", title="G0D M0D3"))
 
     def _handle_auto_result(self, result) -> None:
         if result.status == "finished":
@@ -796,22 +989,36 @@ class RthApp(App):
         self._assistant = None
         self.runlog.assistant(message.text())
 
+    def _on_reasoning(self, text: str) -> None:
+        """The brain's chain-of-thought for this turn: persist it and show it dimmed."""
+        self.runlog.reasoning(text, source="brain")
+        self._mount(widgets.info_panel(text, title="reasoning (CoT)"))
+
+    def _log_tool(self, name: str, args: dict, content: str, is_error: bool) -> None:
+        """Single chokepoint: log EVERY tool execution - brain loop AND slash commands.
+
+        Wired onto registry.ctx.tool_logger, so it fires from ToolRegistry.execute for
+        every tool the brain calls and every tool a /command runs.
+        """
+        self.runlog.tool_call(name, args)
+        self.runlog.tool_result(name, content, is_error)
+
     def _on_tool_start(self, _id: str, name: str, args: dict) -> None:
         self._mount(widgets.tool_call_panel(name, args))
-        self.runlog.set_run_meta(models=self._run_models_meta())
-        self.runlog.tool_call(name, args)
         if name == "query_target":
             self._last_payload = str(args.get("prompt", ""))
 
     def _on_tool_result(
         self, _id: str, name: str, content: str, is_error: bool, technique: str = ""
     ) -> None:
-        self.runlog.tool_result(name, content, is_error)
         if name in ("query_target", "continue_target") and not is_error:
             reply = content.split("\n", 1)[1] if content.startswith("[target") else content
             self._last_reply = reply
             payload = self._last_payload
             tech = technique or name
+            target_cot = getattr(self.registry.ctx, "target_reasoning", "") or ""
+            if target_cot.strip():
+                self.runlog.reasoning(target_cot, source="target")
             if self.judge_enabled:
                 self._mount(widgets.tool_result_panel(name, content, is_error))
                 self.run_worker(
@@ -1002,6 +1209,8 @@ class RthApp(App):
             self.run_worker(self._cmd_campaign(rest), group="judge", exclusive=False)
         elif cmd == "/leaderboard":
             self.run_worker(self._cmd_leaderboard(rest), group="judge", exclusive=False)
+        elif cmd == "/swarm":
+            self.run_worker(self._cmd_swarm(rest, raw_arg), group="judge", exclusive=False)
         elif cmd == "/find":
             self._cmd_find(raw_arg)
         elif cmd == "/leakscan":
@@ -1038,6 +1247,9 @@ class RthApp(App):
             self._cmd_report(rest)
         elif cmd == "/session":
             self._cmd_session(rest)
+        elif cmd == "/resume":
+            # alias: bare → picker, with a path → load it directly
+            self._cmd_session(["load", *rest])
         elif cmd == "/save":
             self._cmd_save(rest)
         else:
@@ -1369,6 +1581,67 @@ class RthApp(App):
             res.content, title="leaderboard"
         )
         self._mount(panel)
+
+    async def _cmd_swarm(self, rest: list[str], raw_arg: str) -> None:
+        """/swarm roster [attackers...]
+        /swarm [siege] [@a,b,c] <objective>
+
+        Fires the attacker swarm at the configured [target]. Default is a one-shot vote;
+        a leading 'siege' token runs the collaborative multi-round siege instead. A leading
+        @-prefixed token selects the roster (comma-separated profile names); otherwise the
+        [swarm] config roster (else every profile except the judge) is used.
+        """
+        args: dict = {}
+        attackers = None
+        objective = raw_arg
+        toks = list(rest)
+        if toks and toks[0].lower() == "roster":
+            args["action"] = "roster"
+            picks = toks[1:]
+            if picks:
+                args["attackers"] = picks
+            self._mount(widgets.info_panel("checking per-model jailbreak status...", title="swarm roster"))
+            res = await self.registry.execute("swarm", args)
+            self._mount(
+                widgets.error_panel(res.content) if res.is_error
+                else widgets.info_panel(res.content, title="swarm roster")
+            )
+            return
+        mode = "vote"
+        if toks and toks[0].lower() in ("siege", "vote"):
+            mode = toks[0].lower()
+            objective = raw_arg[len(rest[0]):].strip()
+            toks = toks[1:]
+        if toks and toks[0].startswith("@"):
+            attackers = [a for a in toks[0][1:].split(",") if a]
+            objective = objective[len(toks[0]):].strip() if objective.startswith(toks[0]) else objective
+        if not objective:
+            self._mount(widgets.info_panel(
+                "usage: /swarm [siege] [@glm,deepseek-pro] <objective>   or   /swarm roster",
+                title="swarm",
+            ))
+            return
+        args["objective"] = objective
+        if mode == "siege":
+            args["action"] = "siege"
+        if attackers:
+            args["attackers"] = attackers
+        if attackers:
+            roster = ", ".join(attackers)
+        elif self.config.swarm_roster:
+            roster = ", ".join(self.config.swarm_roster) + " (config default)"
+        else:
+            roster = "all profiles (except judge)"
+        verb = "laying siege to" if mode == "siege" else "swarming"
+        self._mount(widgets.info_panel(
+            f"{verb} {self.config.target.model if self.config.target else '(no target!)'} "
+            f"with {roster}...", title=f"swarm {mode}",
+        ))
+        res = await self.registry.execute("swarm", args)
+        self._mount(
+            widgets.error_panel(res.content) if res.is_error
+            else widgets.info_panel(res.content, title=f"swarm {mode}")
+        )
 
     def _cmd_leakscan(self) -> None:
         from ..tools.leak_scan import scan_text
@@ -1956,6 +2229,7 @@ class RthApp(App):
             return
         self.objective = raw
         self.runlog.set_run_meta(models=self._run_models_meta())
+        self._sync_vault_meta()
         self.runlog.event("objective", text=raw)
         self.history.append(user(f"[engagement objective] {raw}"))
         self._mount(widgets.info_panel(f"objective set:\n{raw}", title="objective"))
@@ -2087,10 +2361,126 @@ class RthApp(App):
         except OSError as exc:
             self._mount(widgets.error_panel(str(exc)))
 
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        oid = event.option_list.id
+        if oid == "session-picker":
+            path = event.option.id
+            self._close_session_picker()
+            if path:
+                self._load_session_path(path)
+        elif oid == "command-menu":
+            cmd = event.option.id
+            inp = self.query_one("#prompt", Input)
+            inp.value = f"{cmd} "
+            inp.cursor_position = len(inp.value)
+            self._close_command_menu()
+            inp.focus()
+
+    def _session_option_label(self, p) -> Text:
+        from ..session import peek_session_target
+
+        try:
+            st = p.stat()
+            when = datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M")
+            size = st.st_size
+        except OSError:
+            when, size = "?", 0
+        if p.suffix == ".jsonl":
+            kind = "run-log"
+        elif p.name == "autosave.json":
+            kind = "autosave"
+        else:
+            kind = "session"
+        # label by the model that was attacked; old logs with no target stamp
+        # fall back to their filename so the row is still identifiable
+        model = peek_session_target(p) or p.name
+        label = Text()
+        label.append(f"{model[:34]:<34}", style=f"bold {PALETTE['accent']}")
+        label.append(f" {kind:<9}", style=PALETTE["secondary"])
+        label.append(f"  {when}  {size}B", style=PALETTE["label"])
+        return label
+
+    def _open_session_picker(self) -> None:
+        from pathlib import Path
+
+        from ..session import autosave_path, list_sessions
+
+        sessions_dir = Path("sessions")
+        candidates: list = []
+        auto = autosave_path()
+        if auto.exists():
+            candidates.append(auto)
+        candidates.extend(reversed(list_sessions()))
+        if sessions_dir.is_dir():
+            candidates.extend(sorted(sessions_dir.glob("run-*.jsonl"), reverse=True)[:20])
+        # de-dupe, keep first occurrence order
+        seen: set[str] = set()
+        ordered = []
+        for p in candidates:
+            key = str(p)
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(p)
+        if not ordered:
+            self._mount(widgets.error_panel(
+                "no saved sessions under sessions/ — run /session save first, "
+                "or /session load <path>"
+            ))
+            return
+        picker = self.query_one("#session-picker", OptionList)
+        picker.clear_options()
+        self._session_picker_items = [str(p) for p in ordered]
+        for p in ordered:
+            picker.add_option(Option(self._session_option_label(p), id=str(p)))
+        picker.border_title = f"l04d s3ss10n ({len(ordered)}) · enter=l04d · esc=c4nc3l"
+        picker.remove_class("hidden")
+        picker.highlighted = 0
+        picker.focus()
+        self._session_picker_open = True
+
+    def _close_session_picker(self) -> None:
+        self._session_picker_open = False
+        self._session_picker_items = []
+        try:
+            picker = self.query_one("#session-picker", OptionList)
+            picker.add_class("hidden")
+            picker.clear_options()
+        except Exception:
+            pass
+        try:
+            self.query_one("#prompt", Input).focus()
+        except Exception:
+            pass
+
+    def _load_session_path(self, path: str) -> None:
+        from ..session import load_session
+
+        try:
+            history, meta = load_session(path)
+        except (OSError, ValueError) as exc:
+            self._mount(widgets.error_panel(f"load failed: {exc}"))
+            return
+        self.history = history
+        self.objective = meta.get("objective", "")
+        self.template = meta.get("template", "")
+        self.sysprompt = meta.get("sysprompt", "")
+        self.asr_hits = meta.get("asr_hits", 0)
+        self.asr_total = meta.get("asr_total", 0)
+        note = f"loaded {len(history)} messages from {path}"
+        if meta.get("source") == "run_log":
+            note += " (run log: dialogue restored, tool calls omitted)"
+        self._rerender(note)
+        self._refresh_status()
+
     def _cmd_session(self, rest: list[str]) -> None:
-        from ..session import load_session, save_session
+        from ..session import save_session
 
         action = rest[0].lower() if rest else "save"
+        # bare "/session load" with no path → open the interactive picker
+        if action == "load" and len(rest) < 2:
+            self._open_session_picker()
+            return
         path = rest[1] if len(rest) > 1 else "session.json"
         if action == "save":
             meta = self._session_meta()
@@ -2103,22 +2493,7 @@ class RthApp(App):
             except OSError as exc:
                 self._mount(widgets.error_panel(str(exc)))
         elif action == "load":
-            try:
-                history, meta = load_session(path)
-            except (OSError, ValueError) as exc:
-                self._mount(widgets.error_panel(f"load failed: {exc}"))
-                return
-            self.history = history
-            self.objective = meta.get("objective", "")
-            self.template = meta.get("template", "")
-            self.sysprompt = meta.get("sysprompt", "")
-            self.asr_hits = meta.get("asr_hits", 0)
-            self.asr_total = meta.get("asr_total", 0)
-            note = f"loaded {len(history)} messages from {path}"
-            if meta.get("source") == "run_log":
-                note += " (run log: dialogue restored, tool calls omitted)"
-            self._rerender(note)
-            self._refresh_status()
+            self._load_session_path(path)
         else:
             self._mount(widgets.error_panel("usage: /session save|load [path]"))
 

@@ -9,6 +9,7 @@ from ..providers.base import Provider, ProviderError
 from ..tools.registry import ToolRegistry
 from .messages import (
     Message,
+    ReasoningDelta,
     StopEvent,
     TextBlock,
     TextDelta,
@@ -36,7 +37,7 @@ CONTINUE_NUDGE = (
 @dataclass
 class AgentEvents:
     on_text: Callable[[str], None] = lambda _t: None
-    on_reasoning: Callable[[str], None] = lambda _t: None
+    on_reasoning: Callable[[str], None] = lambda _r: None
     on_tool_start: Callable[[str, str, dict], None] = lambda _i, _n, _a: None
     on_tool_result: Callable[[str, str, str, bool], None] = lambda _i, _n, _c, _e: None
     on_turn_end: Callable[[Message], None] = lambda _m: None
@@ -155,7 +156,8 @@ async def run_turn(
                     stream_counts["reasoning_delta"] += 1
                     stream_events.append({"type": "reasoning_delta", "text": ev.text})
                     trace_inference_event(inference_id, stream_events[-1])
-                    events.on_reasoning(ev.text)
+                    # live per-delta streaming goes to the inference trace above; the
+                    # on_reasoning callback fires once with the full text at turn end.
                 elif isinstance(ev, ToolUseEvent):
                     tool_calls.append(ev)
                     stream_counts["tool_use"] += 1
@@ -221,6 +223,10 @@ async def run_turn(
             stream_events=stream_events,
             tool_calls=[{"id": tc.id, "name": tc.name} for tc in tool_calls],
         )
+
+        reasoning = "".join(reasoning_parts).strip()
+        if reasoning:
+            events.on_reasoning(reasoning)
 
         content: list = []
         joined = "".join(text_parts)

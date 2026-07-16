@@ -64,8 +64,10 @@ def test_config_loads_keyless_claude_code_profile():
 
 
 def test_config_claude_code_requires_only_protocol_and_model():
+    # A concrete endpoint (target/judge/art) is parsed with require_model=True, so a
+    # claude-code endpoint still needs a model even though it needs no base_url/api_key.
     with pytest.raises(ConfigError):
-        _endpoint_from_table("cc", {"protocol": "claude-code"})  # missing model
+        _endpoint_from_table("cc", {"protocol": "claude-code"}, require_model=True)  # missing model
 
 
 def test_factory_builds_claude_code_provider():
